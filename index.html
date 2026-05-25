@@ -4,22 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Savaşları - Çift Telefon Senkronize</title>
+    <title>Neon Savaşları - Kulüp & QR Sistemli</title>
     <!-- Tailwind CSS, FontAwesome ve QR Kütüphaneleri -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-
-    <!-- Firebase SDK Modülleri -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        window.firebaseModules = { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, collection };
-    </script>
-
     <style>
         body {
             user-select: none;
@@ -37,7 +27,8 @@
         .neon-shadow-red { box-shadow: 0 0 15px rgba(255, 65, 54, 0.6); }
         .neon-text-blue { text-shadow: 0 0 8px rgba(0, 191, 255, 0.8); }
         .neon-text-red { text-shadow: 0 0 8px rgba(255, 65, 54, 0.8); }
-        
+        .rotate-180 { transform: rotate(180deg); }
+
         .scan-overlay {
             position: absolute;
             inset: 0;
@@ -88,12 +79,17 @@
                     osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.1);
                     gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
                     osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                } else if (type === 'powerup') {
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
                 }
             } catch (e) { console.log("Ses hatası", e); }
         }
     </script>
 
-    <!-- TOAST BİLDİRİM KUTUSU -->
+    <!-- TOAST MESAJ KUTUSU -->
     <div id="toast-message" class="hidden fixed top-6 z-50 bg-slate-900 border border-indigo-500 text-indigo-300 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold transition-all"></div>
     <script>
         function showToast(msg) {
@@ -108,66 +104,69 @@
         <h1 class="text-4xl md:text-5xl font-extrabold mb-1 tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-red-500 font-sans">
             NEON SAVAŞLARI
         </h1>
-        <p class="text-[10px] text-slate-400 mb-6 uppercase tracking-wider">Çift Telefon Uzay Düellosu</p>
+        <p class="text-[10px] text-slate-400 mb-6 uppercase tracking-wider">Uzay Gemisi Düellosu</p>
 
-        <!-- KULÜP DURUMU (KULÜBE BAK BUTONU) -->
+        <!-- KULÜP DURUM BARININ ÜST BAŞLIĞI -->
         <div id="club-status-bar" class="hidden w-full max-w-sm mb-4 bg-indigo-950/40 border border-indigo-500/30 p-2.5 rounded-xl flex items-center justify-between text-xs">
             <span class="font-bold text-indigo-400"><i class="fas fa-shield-alt mr-1"></i> Kulübe Bak</span>
             <button onclick="openClubModal()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-md font-extrabold text-[11px] transition-all">Yönet / İncele</button>
         </div>
 
-        <!-- Mod Seçim Bölümü (Single Player / VS Bot İçin) -->
-        <div id="single-mode-box" class="space-y-4 max-w-sm w-full bg-slate-900/80 p-5 rounded-2xl border border-slate-800 backdrop-blur-md mb-4">
-            <h2 class="text-sm font-bold text-slate-300 tracking-wider">TEK TELEFONDA OYNA</h2>
+        <!-- Mod Seçim Bölümü -->
+        <div class="space-y-4 max-w-sm w-full bg-slate-900/80 p-5 rounded-2xl border border-slate-800 backdrop-blur-md mb-4">
+            <h2 class="text-sm font-bold text-slate-300 tracking-wider">1. OYUN MODUNU SEÇİN</h2>
+            
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="setMode('2player')" id="btn-mode-2p" class="p-3 rounded-xl border-2 border-cyan-500 bg-cyan-950/20 text-xs font-bold transition-all">
+                <button onclick="setMode('2player')" id="btn-mode-2p" class="p-3 rounded-xl border-2 border-cyan-500 bg-cyan-950/20 text-xs font-bold transition-all active:scale-95">
                     <i class="fas fa-users text-lg mb-1 block text-cyan-400"></i>
-                    Yanyana<br>2 Kişi
+                    Tek Telefonda<br>2 Kişi
                 </button>
-                <button onclick="setMode('vsbot')" id="btn-mode-bot" class="p-3 rounded-xl border border-slate-700 bg-slate-800/40 text-xs font-bold transition-all text-slate-400">
+                <button onclick="setMode('vsbot')" id="btn-mode-bot" class="p-3 rounded-xl border border-slate-700 bg-slate-800/40 text-xs font-bold transition-all active:scale-95 text-slate-400">
                     <i class="fas fa-robot text-lg mb-1 block text-slate-400"></i>
-                    Yapay Zeka<br>(Bot)
+                    Yapay Zekaya<br>Karşı (Bot)
                 </button>
             </div>
-            <button onclick="startSingleGame()" class="w-full mt-2 py-3 bg-gradient-to-r from-cyan-500 to-red-500 text-slate-950 font-extrabold text-base rounded-xl shadow-lg transition-all active:scale-95">
-                SAVAŞI BAŞLAT!
+
+            <!-- Normal Hızlı Savaş Butonu -->
+            <button onclick="startGame()" class="w-full mt-2 py-3 bg-gradient-to-r from-cyan-500 to-red-500 text-slate-950 font-extrabold text-base rounded-xl shadow-lg active:scale-95 transition-all">
+                HIZLI SAVAŞI BAŞLAT!
             </button>
         </div>
 
-        <!-- Çift Telefon QR Kulüp Kurma / Katılma Bölümü -->
+        <!-- QR Kod Seçim Bölümü -->
         <div id="qr-options-box" class="space-y-3 max-w-sm w-full bg-slate-900/80 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
-            <h2 class="text-xs font-bold text-slate-400 tracking-wider">ÇİFT TELEFONLA OYNA (ÖNERİLEN)</h2>
+            <h2 class="text-xs font-bold text-slate-400 tracking-wider">2. QR KULÜP SEÇENEKLERİ</h2>
             <div class="grid grid-cols-2 gap-2 text-xs">
                 <button onclick="generateQRCode()" class="py-2.5 bg-indigo-950/50 border border-indigo-500/50 text-indigo-300 rounded-lg font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
                     <i class="fas fa-qrcode text-base"></i>
-                    Kulüp Kur (Mavi Ol)
+                    Kulüp Kur (QR Üret)
                 </button>
                 <button onclick="startQRScanner()" class="py-2.5 bg-emerald-950/50 border border-emerald-500/50 text-emerald-300 rounded-lg font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
                     <i class="fas fa-camera text-base"></i>
-                    Kulübe Katıl (Kırmızı Ol)
+                    Kulübe Katıl (QR Oku)
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- KULÜP YÖNETİM MODALİ (KULÜBE BAK PENCERESİ) -->
+    <!-- KULÜP YÖNETİM MODALI (KULÜBE BAK PENCERESİ) -->
     <div id="club-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-4">
         <div class="bg-slate-900 border border-indigo-500/50 rounded-2xl p-5 max-w-sm w-full space-y-4 relative">
             
-            <!-- Sadece pencereyi kapatan Çarpı (X) butonu - Kulüpten asla ayrılmaz -->
-            <button onclick="closeClubModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg transition-all">
+            <!-- Çarpı (X) Butonu - Kulüpten Ayrılmadan Sadece Pencereyi Kapatır -->
+            <button onclick="closeClubModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg transition-all focus:outline-none">
                 <i class="fas fa-times"></i>
             </button>
 
             <div class="flex justify-between items-center border-b border-slate-800 pb-2">
                 <h3 class="font-bold text-indigo-400 flex items-center gap-2"><i class="fas fa-users-cog"></i> Kulüp Odası</h3>
-                <span id="club-id-tag" class="bg-slate-800 text-[10px] font-mono px-2 py-0.5 rounded text-slate-300">ODA: #----</span>
+                <span id="club-id-tag" class="bg-slate-800 text-[10px] font-mono px-2 py-0.5 rounded text-slate-300">ODA: #7821</span>
             </div>
 
-            <!-- Kaç Tur Olacak Ayarı (Sadece Oda Sahibi Mavi değiştirebilir) -->
+            <!-- Kaç Tur Olacak Ayarı -->
             <div class="space-y-2">
                 <label class="text-xs text-slate-400 block text-left font-semibold">Hedef Tur Sayısı:</label>
-                <div class="grid grid-cols-4 gap-1.5" id="round-options-container">
+                <div class="grid grid-cols-4 gap-1.5">
                     <button onclick="setTargetRounds(1)" id="round-btn-1" class="py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 text-slate-400">1 Tur</button>
                     <button onclick="setTargetRounds(3)" id="round-btn-3" class="py-1.5 rounded-lg text-xs font-bold border-2 border-indigo-500 bg-indigo-950/30 text-white">3 Tur</button>
                     <button onclick="setTargetRounds(5)" id="round-btn-5" class="py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 text-slate-400">5 Tur</button>
@@ -175,26 +174,26 @@
                 </div>
             </div>
 
-            <!-- Bağlı Telefonlar ve Rol Durumu -->
+            <!-- Bağlı Cihazlar Listesi -->
             <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2 text-left">
-                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Oyuncu Telefonları</span>
+                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Kulüpteki Oyuncular</span>
                 <div class="flex items-center justify-between text-xs py-1 border-b border-slate-900/50">
-                    <span class="text-cyan-400 font-medium"><i class="fas fa-mobile-alt mr-1.5"></i> Cihaz-1 (Mavi Gemi)</span>
-                    <span id="p1-status" class="text-[10px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded">Bağlı</span>
+                    <span class="text-cyan-400 font-medium"><i class="fas fa-mobile-alt mr-1.5"></i> Cihaz-1 (Siz)</span>
+                    <span class="text-[10px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded">Lider</span>
                 </div>
-                <div class="flex items-center justify-between text-xs py-1">
-                    <span class="text-red-400 font-medium"><i class="fas fa-mobile-alt mr-1.5"></i> Cihaz-2 (Kırmızı Gemi)</span>
-                    <span id="p2-status" class="text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded">Bekleniyor...</span>
+                <div id="club-guest-row" class="flex items-center justify-between text-xs py-1">
+                    <span class="text-red-400 font-medium"><i class="fas fa-mobile-alt mr-1.5"></i> Cihaz-2 (Bağlandı)</span>
+                    <span class="text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded">Hazır</span>
                 </div>
             </div>
 
             <!-- Oyun Oynamaya Başla ve Kulüpten Ayrıl Butonları -->
             <div class="space-y-2 pt-2">
-                <button onclick="startClubGame()" id="start-club-game-btn" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg transition-all active:scale-95">
+                <button onclick="startClubGame()" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg transition-all active:scale-95">
                     <i class="fas fa-play mr-1.5"></i> Oyun Oynamaya Başla!
                 </button>
                 <button onclick="leaveClub()" class="w-full py-2 bg-red-950/20 hover:bg-red-900/30 border border-red-500/30 text-red-400 font-bold text-xs rounded-xl transition-all">
-                    Kulüpten Ayrıl
+                    Kulüpten Ayrıl (Odayı Dağıt)
                 </button>
             </div>
         </div>
@@ -203,11 +202,11 @@
     <!-- QR GENERATOR MODAL -->
     <div id="qr-gen-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-6 text-center">
         <div class="bg-slate-900 p-6 rounded-2xl border border-indigo-500/50 max-w-xs w-full flex flex-col items-center">
-            <h3 class="text-base font-bold mb-2 text-indigo-400">Kulüp Odası Kuruldu</h3>
-            <p class="text-[10px] text-slate-400 mb-4">Mavi Oyuncu sizsiniz. Kırmızı oyuncu bu kodu kendi telefonundan okutmalıdır.</p>
+            <h3 class="text-base font-bold mb-2 text-indigo-400">Kulüp Kuruldu!</h3>
+            <p class="text-[10px] text-slate-400 mb-4">Diğer telefon bu kodu taratarak odayaya anında bağlanabilir.</p>
             <div id="qrcode-area" class="bg-white p-5 rounded-xl mb-4 border-4 border-indigo-500"></div>
-            <button onclick="closeQRGen()" class="w-full py-2 bg-indigo-600 font-bold text-xs rounded-lg transition-all">
-                Kulübe Git
+            <button onclick="closeQRGen()" class="w-full py-2 bg-indigo-600 font-bold text-xs rounded-lg transition-all active:scale-95">
+                Kulübe Git (Paneli Aç)
             </button>
         </div>
     </div>
@@ -215,8 +214,8 @@
     <!-- QR CAMERA SCANNER DIALOG -->
     <div id="qr-scan-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-4 text-center">
         <div class="bg-slate-900 p-4 rounded-2xl border border-emerald-500/50 max-w-sm w-full flex flex-col items-center">
-            <h3 class="text-base font-bold mb-1 text-emerald-400">Oda QR Kodunu Tara</h3>
-            <p class="text-[10px] text-slate-400 mb-3">Kamerayı diğer telefondaki QR koda tutun.</p>
+            <h3 class="text-base font-bold mb-1 text-emerald-400">Kulüp Kodunu Tara</h3>
+            <p class="text-[10px] text-slate-400 mb-3">Kodu yeşil alan içerisine getirin.</p>
             
             <div id="scanner-view" class="w-full aspect-square bg-black rounded-xl overflow-hidden mb-4 relative border-2 border-emerald-500/30">
                 <div class="scan-overlay">
@@ -227,7 +226,7 @@
                     <div class="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-emerald-400"></div>
                 </div>
             </div>
-            <button onclick="stopQRScanner()" class="w-full py-2 bg-slate-800 text-xs font-bold rounded-lg">Kapat</button>
+            <button onclick="stopQRScanner()" class="w-full py-2 bg-slate-800 text-xs font-bold rounded-lg active:scale-95">Kamerayı Kapat</button>
         </div>
     </div>
 
@@ -248,15 +247,15 @@
         </div>
     </div>
 
-    <!-- ÜST OYUNCU PANELİ (Eğer çift telefondaysak ve Kırmızı oyuncuysak bu kısım gizlenir/düzeltilir) -->
-    <div id="p2-control-panel" class="w-full h-1/4 bg-slate-950/80 border-b border-red-900/30 flex flex-col justify-between p-3 rotate-180">
+    <!-- ÜST OYUNCU KONTROL PANELİ (Kırmızı - 180 derece dönük) -->
+    <div id="p2-control-panel" class="w-full h-1/4 bg-slate-950/80 border-b border-red-900/30 flex flex-col justify-between p-3 rotate-180 font-sans">
         <div class="flex justify-between items-center w-full">
             <div class="flex flex-col items-start">
                 <span id="p2-label" class="text-xs font-bold text-red-500 neon-text-red">KIRMIZI OYUNCU</span>
                 <div class="flex gap-1 mt-1" id="p2-hearts"></div>
             </div>
             <div class="text-right">
-                <div class="text-[10px] text-slate-400 font-semibold">SERİ SKOR</div>
+                <div class="text-[10px] text-slate-400">SERİ SKOR</div>
                 <div class="text-xl font-bold text-red-500" id="p2-score">0</div>
             </div>
         </div>
@@ -281,8 +280,8 @@
         </div>
     </div>
 
-    <!-- ALT OYUNCU PANELİ (Mavi Oyuncu Kontrolü - Düz) -->
-    <div id="p1-control-panel" class="w-full h-1/4 bg-slate-950/80 border-t border-cyan-900/30 flex flex-col justify-between p-3">
+    <!-- ALT OYUNCU KONTROL PANELİ (Düz - Mavi) -->
+    <div class="w-full h-1/4 bg-slate-950/80 border-t border-cyan-900/30 flex flex-col justify-between p-3 font-sans">
         <div class="flex justify-between items-center w-full gap-4 mb-2">
             <div class="flex gap-2">
                 <button id="p1-btn-left" class="touch-btn w-14 h-14 bg-cyan-950/40 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 neon-shadow-blue"><i class="fas fa-undo text-xl"></i></button>
@@ -296,42 +295,18 @@
 
         <div class="flex justify-between items-center w-full">
             <div class="flex flex-col items-start">
-                <span id="p1-label" class="text-xs font-bold text-cyan-400 neon-text-blue">MAVİ OYUNCU (SİZ)</span>
+                <span class="text-xs font-bold text-cyan-400 neon-text-blue">MAVİ OYUNCU (SİZ)</span>
                 <div class="flex gap-1 mt-1" id="p1-hearts"></div>
             </div>
             <div class="text-right">
-                <div class="text-[10px] text-slate-400 font-semibold">SERİ SKOR</div>
+                <div class="text-[10px] text-slate-400">SERİ SKOR</div>
                 <div class="text-xl font-bold text-cyan-400" id="p1-score">0</div>
             </div>
         </div>
     </div>
 
-    <!-- OYUN MULTIPLAYER VE SENKRONİZASYON MOTORU -->
-    <script type="module">
-        const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, deleteDoc, collection } = window.firebaseModules;
-
-        // Firebase Yapılandırması ve Başlatılması
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'neon-wars-mp';
-
-        // Kullanıcı Giriş İşlemi
-        let currentUser = null;
-        async function initAuth() {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        }
-        
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-        });
-        initAuth();
-
+    <!-- OYUN FİZİĞİ, ODA YÖNETİMİ VE TÜM SİSTEM SCRIPTİ -->
+    <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -342,12 +317,12 @@
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // Rol ve Oda Değişkenleri
-        let myRole = 'solo'; // 'blue' (kurucu), 'red' (katılan), 'solo' (tek telefon)
-        let roomCode = null;
+        // KULÜP SİSTEMİ DURUM DEĞİŞKENLERİ
         let isInClub = false;
-        let targetRounds = 3;
-        let isP2Connected = false;
+        let targetRounds = 3; 
+        let currentClubId = null;
+        let isGuestConnected = false;
+
         let gameMode = '2player';
         let gameRunning = false;
         let p1Score = 0;
@@ -358,14 +333,20 @@
             p2: { left: false, right: false, thrust: false, shoot: false, lastShoot: 0 }
         };
 
-        // Gemi Tasarımı
+        // Gemi Sınıfı
         class Ship {
             constructor(x, y, color, angle, id) {
                 this.id = id; this.x = x; this.y = y; this.color = color; this.angle = angle;
                 this.vx = 0; this.vy = 0; this.radius = 18; this.maxHp = 3; this.hp = 3;
+                this.shield = 0; this.tripleShot = 0;
             }
             draw() {
                 ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                if (this.shield > 0) {
+                    ctx.beginPath(); ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+                    ctx.strokeStyle = this.color === 'blue' ? '#38bdf8' : '#ef4444';
+                    ctx.lineWidth = 2; ctx.stroke();
+                }
                 ctx.beginPath(); ctx.moveTo(this.radius, 0); ctx.lineTo(-this.radius, -this.radius * 0.8);
                 ctx.lineTo(-this.radius * 0.5, 0); ctx.lineTo(-this.radius, this.radius * 0.8); ctx.closePath();
                 ctx.fillStyle = '#0f172a'; ctx.fill();
@@ -379,8 +360,11 @@
                 if (this.x > canvas.width - this.radius) { this.x = canvas.width - this.radius; this.vx *= -0.5; }
                 if (this.y < this.radius) { this.y = this.radius; this.vy *= -0.5; }
                 if (this.y > canvas.height - this.radius) { this.y = canvas.height - this.radius; this.vy *= -0.5; }
+                if (this.shield > 0) this.shield--;
+                if (this.tripleShot > 0) this.tripleShot--;
             }
             takeDamage() {
+                if (this.shield > 0) return false;
                 this.hp--; playSound('hit');
                 createExplosion(this.x, this.y, this.color, 10);
                 updateHearts(this.id, this.hp);
@@ -389,7 +373,7 @@
             }
         }
 
-        // Mermi Tasarımı
+        // Mermi Sınıfı
         class Bullet {
             constructor(x, y, angle, color, ownerId) {
                 this.x = x; this.y = y;
@@ -403,7 +387,7 @@
             update() { this.x += this.vx; this.y += this.vy; this.life--; }
         }
 
-        // Efektler
+        // Parçacık Yapısı
         class Particle {
             constructor(x, y, color) {
                 this.x = x; this.y = y;
@@ -436,7 +420,6 @@
 
         function updateHearts(playerId, hp) {
             const container = document.getElementById(`p${playerId}-hearts`);
-            if (!container) return;
             container.innerHTML = '';
             const colorClass = playerId === 1 ? 'text-cyan-400' : 'text-red-500';
             for (let i = 0; i < 3; i++) {
@@ -468,50 +451,21 @@
             if (Math.abs(angleDiff) < 0.4 && Math.random() < 0.07) fireBullet(p2);
         }
 
-        // BULUT EŞLEŞME ODASI VERİ YAZMA / GÜNCELLEME SÜRECİ
-        async function updateRoomFirebaseState() {
-            if (!isInClub || !roomCode || !currentUser) return;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-            
-            let p1Data = { x: p1.x, y: p1.y, angle: p1.angle, hp: p1.hp, isThrusting: inputs.p1.thrust };
-            let p2Data = { x: p2.x, y: p2.y, angle: p2.angle, hp: p2.hp, isThrusting: inputs.p2.thrust };
-
-            // Ateş edilen yeni mermileri Firestore'a aktarma
-            let activeBullets = bullets.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, color: b.color, ownerId: b.ownerId, life: b.life }));
-
-            try {
-                if (myRole === 'blue') {
-                    await updateDoc(roomRef, { p1: p1Data, bullets: activeBullets });
-                } else if (myRole === 'red') {
-                    await updateDoc(roomRef, { p2: p2Data });
-                }
-            } catch (err) {
-                console.warn("Firebase güncelleme hatası: ", err);
-            }
-        }
-
-        // Oyun Döngüsü
         function gameLoop() {
             if (!gameRunning) return;
             ctx.fillStyle = 'rgba(13, 14, 21, 0.4)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Mavi Kontrolleri
-            if (myRole === 'blue' || myRole === 'solo') {
-                if (inputs.p1.left) p1.angle -= 0.05;
-                if (inputs.p1.right) p1.angle += 0.05;
-                if (inputs.p1.thrust) { p1.vx += Math.cos(p1.angle) * 0.15; p1.vy += Math.sin(p1.angle) * 0.15; }
-                if (inputs.p1.shoot) fireBullet(p1);
-            }
+            if (inputs.p1.left) p1.angle -= 0.05;
+            if (inputs.p1.right) p1.angle += 0.05;
+            if (inputs.p1.thrust) { p1.vx += Math.cos(p1.angle) * 0.15; p1.vy += Math.sin(p1.angle) * 0.15; }
+            if (inputs.p1.shoot) fireBullet(p1);
 
-            // Kırmızı Kontrolleri
-            if (myRole === 'red' || myRole === 'solo') {
-                if (gameMode === '2player') {
-                    if (inputs.p2.left) p2.angle -= 0.05;
-                    if (inputs.p2.right) p2.angle += 0.05;
-                    if (inputs.p2.thrust) { p2.vx += Math.cos(p2.angle) * 0.15; p2.vy += Math.sin(p2.angle) * 0.15; }
-                    if (inputs.p2.shoot) fireBullet(p2);
-                } else { updateBotAI(); }
-            }
+            if (gameMode === '2player') {
+                if (inputs.p2.left) p2.angle -= 0.05;
+                if (inputs.p2.right) p2.angle += 0.05;
+                if (inputs.p2.thrust) { p2.vx += Math.cos(p2.angle) * 0.15; p2.vy += Math.sin(p2.angle) * 0.15; }
+                if (inputs.p2.shoot) fireBullet(p2);
+            } else { updateBotAI(); }
 
             p1.update(); p1.draw();
             p2.update(); p2.draw();
@@ -522,7 +476,6 @@
                 p2.vx = tempVx * 1.2; p2.vy = tempVy * 1.2;
             }
 
-            // Mermi Çarpışma ve Hareket Yönetimi
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const b = bullets[i]; b.update(); b.draw();
                 if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) { bullets.splice(i, 1); continue; }
@@ -538,18 +491,11 @@
                 particles[i].update(); particles[i].draw();
                 if (particles[i].life <= 0) particles.splice(i, 1);
             }
-
-            // Çift telefonda veri senkronizasyonu tetiklenir
-            if (isInClub) {
-                updateRoomFirebaseState();
-            }
-
             requestAnimationFrame(gameLoop);
         }
 
-        // Savaş Başlatma
-        function startSingleGame() {
-            myRole = 'solo';
+        // Hızlı savaşı başlat
+        function startGame() {
             initAudio();
             document.getElementById('start-screen').classList.add('hidden');
             initGameObjects();
@@ -557,29 +503,13 @@
             requestAnimationFrame(gameLoop);
         }
 
-        async function startClubGame() {
-            if (!isP2Connected) {
-                showToast("Karşı oyuncunun bağlanması bekleniyor!");
-                return;
-            }
-            if (myRole === 'blue') {
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                await updateDoc(roomRef, { isStarted: true });
-            }
-        }
-
-        // Oyunu Başlatma Tetikleyicisi
-        function triggerGameStart() {
+        // Kulüp üzerinden savaşı başlat
+        function startClubGame() {
             closeClubModal();
-            initAudio();
-            document.getElementById('start-screen').classList.add('hidden');
-            initGameObjects();
-            gameRunning = true;
-            requestAnimationFrame(gameLoop);
+            startGame();
         }
 
-        // Oyun Bitiş Kontrolü
-        async function endGame(winnerId) {
+        function endGame(winnerId) {
             gameRunning = false;
             const screen = document.getElementById('gameover-screen');
             const winnerText = document.getElementById('winner-text');
@@ -595,21 +525,17 @@
                 winnerText.className = "text-3xl font-extrabold mb-2 text-red-500 neon-text-red";
             }
 
+            // Seri tur hedef kontrolü
             if (isInClub) {
-                if (myRole === 'blue') {
-                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                    await updateDoc(roomRef, { p1Score, p2Score, isStarted: false });
-                }
-                
                 if (p1Score >= targetRounds) {
                     winnerText.innerText = "KULÜP ŞAMPİYONU: MAVİ!";
-                    subtext.innerText = `${targetRounds} Tur hedefine ulaşıldı!`;
+                    subtext.innerText = `Hedeflenen ${targetRounds} tura başarıyla ulaşıldı!`;
                     p1Score = 0; p2Score = 0;
                     document.getElementById('p1-score').innerText = "0";
                     document.getElementById('p2-score').innerText = "0";
                 } else if (p2Score >= targetRounds) {
-                    winnerText.innerText = "KULÜP ŞAMPİYONU: KIRMIZI!";
-                    subtext.innerText = `${targetRounds} Tur hedefine ulaşıldı!`;
+                    winnerText.innerText = gameMode === 'vsbot' ? "KULÜP ŞAMPİYONU: BOT!" : "KULÜP ŞAMPİYONU: KIRMIZI!";
+                    subtext.innerText = `Hedeflenen ${targetRounds} tura başarıyla ulaşıldı!`;
                     p1Score = 0; p2Score = 0;
                     document.getElementById('p1-score').innerText = "0";
                     document.getElementById('p2-score').innerText = "0";
@@ -623,240 +549,116 @@
             screen.classList.remove('hidden');
         }
 
-        async function restartGame() {
+        function restartGame() {
             document.getElementById('gameover-screen').classList.add('hidden');
-            if (isInClub && myRole === 'blue') {
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                await updateDoc(roomRef, { isStarted: true });
-            } else if (!isInClub) {
-                initGameObjects();
-                gameRunning = true;
-                requestAnimationFrame(gameLoop);
-            }
+            initGameObjects();
+            gameRunning = true;
+            requestAnimationFrame(gameLoop);
         }
 
+        // Maç bittiğinde kulübe geri dönüş (Skorlar kaybolmaz, kulüp korunur)
         function quitToClubMenu() {
             document.getElementById('gameover-screen').classList.add('hidden');
             document.getElementById('start-screen').classList.remove('hidden');
-            openClubModal();
+            openClubModal(); // Kulüp paneli direkt açılır
         }
 
-        // --- CLOUD KULÜP YÖNETİMİ ---
-        let unsubRoom = null;
-
-        async function generateQRCode() {
-            if (!currentUser) return;
-            roomCode = String(Math.floor(1000 + Math.random() * 9000));
-            document.getElementById('club-id-tag').innerText = "ODA: #" + roomCode;
+        // --- KULÜP YÖNETİM FONKSİYONLARI ---
+        function generateQRCode() {
+            currentClubId = Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('club-id-tag').innerText = "ODA: #" + currentClubId;
             
-            myRole = 'blue';
-            isInClub = true;
-
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-            await setDoc(roomRef, {
-                roomId: roomCode,
-                p1Joined: true,
-                p2Joined: false,
-                targetRounds,
-                p1Score: 0,
-                p2Score: 0,
-                isStarted: false,
-                bullets: [],
-                p1: { x: canvas.width / 2, y: canvas.height - 60, angle: -Math.PI / 2, hp: 3, isThrusting: false },
-                p2: { x: canvas.width / 2, y: 60, angle: Math.PI / 2, hp: 3, isThrusting: false }
-            });
-
             const area = document.getElementById('qrcode-area');
             area.innerHTML = "";
-            const qrData = JSON.stringify({ roomCode, action: 'join-club' });
+            
+            // Veri yapısı oda id bilgisini içerir
+            const qrData = JSON.stringify({ clubId: currentClubId, action: 'join-club' });
             
             new QRCode(area, {
                 text: qrData, width: 160, height: 160,
                 colorDark : "#0d0e15", colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.M
+                correctLevel : QRCode.CorrectLevel.M // Daha hızlı okuma için M seviyesi
             });
 
             document.getElementById('qr-gen-modal').classList.remove('hidden');
-            listenRoomState();
-            adjustControlsForRole();
+            setupClubState(true);
         }
 
         function closeQRGen() {
             document.getElementById('qr-gen-modal').classList.add('hidden');
-            openClubModal();
+            openClubModal(); // Doğrudan yönetim modalını aç
         }
 
-        // Cihaza Göre Buton Görünürlüğünü Ayarlama
-        function adjustControlsForRole() {
-            const p1Panel = document.getElementById('p1-control-panel');
-            const p2Panel = document.getElementById('p2-control-panel');
-            const p1Label = document.getElementById('p1-label');
-            const p2Label = document.getElementById('p2-label');
-
-            if (myRole === 'blue') {
-                p2Panel.classList.add('hidden'); // Kırmızı butonları kuran telefondan gizle
-                p1Panel.classList.remove('hidden');
-                p1Label.innerText = "MAVİ OYUNCU (SİZ)";
-            } else if (myRole === 'red') {
-                p1Panel.classList.add('hidden'); // Mavi butonları katılan telefondan gizle
-                p2Panel.classList.remove('hidden');
-                p2Panel.classList.remove('rotate-180'); // Katılan telefonda Kırmızı butonlar düz dursun
-                p2Label.innerText = "KIRMIZI OYUNCU (SİZ)";
+        function setupClubState(active) {
+            isInClub = active;
+            if (active) {
+                isGuestConnected = true;
+                document.getElementById('club-status-bar').classList.remove('hidden');
+                document.getElementById('club-guest-row').classList.remove('hidden');
+                document.getElementById('qr-options-box').classList.add('hidden'); // Yeni oda açma gizlenir
             } else {
-                p1Panel.classList.remove('hidden');
-                p2Panel.classList.remove('hidden');
-                p2Panel.classList.add('rotate-180');
-                p1Label.innerText = "MAVİ OYUNCU";
-                p2Label.innerText = "KIRMIZI OYUNCU";
+                isGuestConnected = false;
+                currentClubId = null;
+                p1Score = 0; p2Score = 0;
+                document.getElementById('p1-score').innerText = "0";
+                document.getElementById('p2-score').innerText = "0";
+                document.getElementById('club-status-bar').classList.add('hidden');
+                document.getElementById('qr-options-box').classList.remove('hidden');
             }
         }
 
-        // Firebase Gerçek Zamanlı Oda Değişiklik Dinleyicisi
-        function listenRoomState() {
-            if (!roomCode) return;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-            
-            unsubRoom = onSnapshot(roomRef, (snapshot) => {
-                if (!snapshot.exists()) return;
-                const data = snapshot.data();
+        function openClubModal() { document.getElementById('club-modal').classList.remove('hidden'); }
+        function closeClubModal() { document.getElementById('club-modal').classList.add('hidden'); }
 
-                // 2. Oyuncu bağlantı denetimi
-                isP2Connected = data.p2Joined;
-                document.getElementById('p2-status').innerText = isP2Connected ? "Cihaz-2 (Katıldı)" : "Bekleniyor...";
-                document.getElementById('p2-status').className = isP2Connected ? "text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded font-bold" : "text-[10px] bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded";
-
-                targetRounds = data.targetRounds;
-                syncTargetRoundsButtons();
-
-                // Oyun Başlatma Senkronu
-                if (data.isStarted && !gameRunning) {
-                    triggerGameStart();
-                }
-
-                // Skor ve Can Senkronu
-                p1Score = data.p1Score;
-                p2Score = data.p2Score;
-                document.getElementById('p1-score').innerText = p1Score;
-                document.getElementById('p2-score').innerText = p2Score;
-
-                // Koordinat Senkronizasyonu (Veriyi üreten taraftan okuma)
-                if (myRole === 'red') {
-                    // Kırmızı oyuncu sadece Maviyi ve mermileri günceller
-                    p1.x = data.p1.x;
-                    p1.y = data.p1.y;
-                    p1.angle = data.p1.angle;
-                    p1.hp = data.p1.hp;
-                    updateHearts(1, p1.hp);
-
-                    if (data.bullets) {
-                        bullets = data.bullets.map(b => new Bullet(b.x, b.y, Math.atan2(b.vy, b.vx), b.color, b.ownerId));
-                    }
-                } else if (myRole === 'blue') {
-                    // Mavi oyuncu sadece Kırmızıyı günceller
-                    p2.x = data.p2.x;
-                    p2.y = data.p2.y;
-                    p2.angle = data.p2.angle;
-                    p2.hp = data.p2.hp;
-                    updateHearts(2, p2.hp);
-                }
-            }, (error) => {
-                console.error("Yayın dinleme kesildi: ", error);
-            });
-        }
-
-        function syncTargetRoundsButtons() {
+        function setTargetRounds(rounds) {
+            targetRounds = rounds;
             [1, 3, 5, 10].forEach(r => {
                 const btn = document.getElementById(`round-btn-${r}`);
-                if (!btn) return;
-                if (r === targetRounds) {
+                if (r === rounds) {
                     btn.className = "py-1.5 rounded-lg text-xs font-bold border-2 border-indigo-500 bg-indigo-950/30 text-white";
                 } else {
                     btn.className = "py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 text-slate-400";
                 }
             });
+            showToast(`Maç hedefi ${rounds} Tur olarak güncellendi!`);
         }
 
-        async function setTargetRounds(rounds) {
-            if (myRole !== 'blue') {
-                showToast("Yalnızca odayı kuran hedef turları belirleyebilir!");
-                return;
-            }
-            targetRounds = rounds;
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-            await updateDoc(roomRef, { targetRounds: rounds });
-            showToast(`Tur hedefi ${rounds} Tur olarak güncellendi!`);
-        }
-
-        // Kulüpten Ayrılma
-        async function leaveClub() {
-            if (unsubRoom) unsubRoom();
-            if (myRole === 'blue' && roomCode) {
-                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                await deleteDoc(roomRef);
-            }
-            isInClub = false;
-            roomCode = null;
-            myRole = 'solo';
-            isP2Connected = false;
-
-            document.getElementById('club-status-bar').classList.add('hidden');
-            document.getElementById('qr-options-box').classList.remove('hidden');
-            document.getElementById('single-mode-box').classList.remove('hidden');
-            
-            adjustControlsForRole();
+        // KULÜPTEN AYRILMA (Her şeyi sıfırlar ve yeniden oluşturulabilir hale getirir)
+        function leaveClub() {
+            setupClubState(false);
             closeClubModal();
-            showToast("Kulüpten ayrıldınız. Her şey sıfırlandı.");
+            showToast("Kulüpten ayrıldınız. Yeni bir kulüp oluşturabilir veya katılabilirsiniz.");
         }
 
-        function openClubModal() {
-            document.getElementById('club-modal').classList.remove('hidden');
-            if (myRole === 'red') {
-                document.getElementById('start-club-game-btn').classList.add('hidden'); // Sadece kurucu başlatabilir
-            } else {
-                document.getElementById('start-club-game-btn').classList.remove('hidden');
-            }
-        }
-        function closeClubModal() { document.getElementById('club-modal').classList.add('hidden'); }
-
-        // --- HIZLI SCANNER ---
+        // --- ULTRA HIZLI SCANNER AYARLARI ---
         let html5QrcodeScanner = null;
         function startQRScanner() {
             document.getElementById('qr-scan-modal').classList.remove('hidden');
             html5QrcodeScanner = new Html5Qrcode("scanner-view");
             const config = { 
-                fps: 30, 
+                fps: 30, // Maksimum okuma hızı için 30 FPS
                 qrbox: function(w, h) { return { width: Math.floor(Math.min(w, h) * 0.8), height: Math.floor(Math.min(w, h) * 0.8) }; },
                 aspectRatio: 1.0
             };
             html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
         }
 
-        async function onScanSuccess(decodedText) {
+        function onScanSuccess(decodedText) {
             try {
                 const data = JSON.parse(decodedText);
                 if (data.action === 'join-club') {
                     playSound('powerup');
-                    roomCode = data.roomCode;
-                    myRole = 'red';
-                    isInClub = true;
-
-                    // Katılım Bilgisini Yazma
-                    const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
-                    await updateDoc(roomRef, { p2Joined: true });
-
-                    document.getElementById('club-id-tag').innerText = "ODA: #" + roomCode;
-                    document.getElementById('club-status-bar').classList.remove('hidden');
-                    document.getElementById('qr-options-box').classList.add('hidden');
-                    document.getElementById('single-mode-box').classList.add('hidden');
-
-                    showToast("Kulübe Muvaffakiyetle Katıldınız!");
+                    currentClubId = data.clubId;
+                    document.getElementById('club-id-tag').innerText = "ODA: #" + currentClubId;
+                    setupClubState(true);
+                    showToast(`Kulübe başarıyla katıldınız! Oda: #${currentClubId}`);
                     stopQRScanner();
-                    listenRoomState();
-                    adjustControlsForRole();
-                    setTimeout(() => { openClubModal(); }, 600);
+                    setTimeout(() => {
+                        openClubModal(); // Tarama sonrası doğrudan yönetim panelini aç
+                    }, 500);
                 }
             } catch (e) {
-                showToast("Geçersiz veya uyumsuz QR kod.");
+                showToast("Bu geçerli bir oyun kulüp kodu değil!");
                 stopQRScanner();
             }
         }
@@ -868,7 +670,7 @@
             } else { document.getElementById('qr-scan-modal').classList.add('hidden'); }
         }
 
-        // Tuş ve Dokunmatik Kontrolleri Eşleştirme
+        // Kontrolcü eşleşmeleri
         function setupTouchControls() {
             const touchMappings = [
                 { id: 'p1-btn-left', player: 'p1', action: 'left' }, { id: 'p1-btn-right', player: 'p1', action: 'right' },
@@ -878,7 +680,7 @@
             ];
             touchMappings.forEach(map => {
                 const btn = document.getElementById(map.id); if (!btn) return;
-                const start = (e) => { e.preventDefault(); initAudio(); inputs[map.player][map.action] = true; };
+                const start = (e) => { e.preventDefault(); initAudio(); if (gameMode === 'vsbot' && map.player === 'p2') return; inputs[map.player][map.action] = true; };
                 const end = (e) => { e.preventDefault(); inputs[map.player][map.action] = false; };
                 btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
                 btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
@@ -888,32 +690,19 @@
         function setMode(mode) {
             gameMode = mode;
             const btn2p = document.getElementById('btn-mode-2p'); const btnBot = document.getElementById('btn-mode-bot');
+            const p2Label = document.getElementById('p2-label'); const p2Actions = document.getElementById('p2-action-buttons');
             if (mode === '2player') {
                 btn2p.className = "p-3 rounded-xl border-2 border-cyan-500 bg-cyan-950/20 text-xs font-bold text-white";
                 btnBot.className = "p-3 rounded-xl border border-slate-700 bg-slate-800/40 text-xs font-bold text-slate-400";
+                p2Label.innerText = "KIRMIZI OYUNCU"; p2Actions.classList.remove('invisible');
             } else {
                 btnBot.className = "p-3 rounded-xl border-2 border-red-500 bg-red-950/20 text-xs font-bold text-white";
                 btn2p.className = "p-3 rounded-xl border border-slate-700 bg-slate-800/40 text-xs font-bold text-slate-400";
+                p2Label.innerText = "KIRMIZI OYUNCU (BOT)"; p2Actions.classList.add('invisible');
             }
         }
 
         window.onload = function() { setupTouchControls(); setMode('2player'); };
-
-        // Dışarıya açılan fonksiyonlar
-        window.generateQRCode = generateQRCode;
-        window.closeQRGen = closeQRGen;
-        window.startQRScanner = startQRScanner;
-        window.stopQRScanner = stopQRScanner;
-        window.openClubModal = openClubModal;
-        window.closeClubModal = closeClubModal;
-        window.setTargetRounds = setTargetRounds;
-        window.leaveClub = leaveClub;
-        window.startClubGame = startClubGame;
-        window.startSingleGame = startSingleGame;
-        window.restartGame = restartGame;
-        window.quitToClubMenu = quitToClubMenu;
-        window.setMode = setMode;
-        window.startGame = startSingleGame;
     </script>
 </body>
 </html>
