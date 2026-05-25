@@ -4,12 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Savaşları - Kulüp & QR Sistemli</title>
-    <!-- Tailwind CSS, FontAwesome ve QR Kütüphaneleri -->
+    <title>Neon Savaşları - 2 Kişilik</title>
+    <!-- Tailwind CSS ve FontAwesome CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
         body {
             user-select: none;
@@ -19,356 +17,341 @@
             background-color: #0d0e15;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
+        /* Dokunmatik gecikmesini engelleme ve kaydırmayı devre dışı bırakma */
         .touch-btn {
             touch-action: manipulation;
             -webkit-tap-highlight-color: transparent;
         }
-        .neon-shadow-blue { box-shadow: 0 0 15px rgba(0, 191, 255, 0.6); }
-        .neon-shadow-red { box-shadow: 0 0 15px rgba(255, 65, 54, 0.6); }
-        .neon-text-blue { text-shadow: 0 0 8px rgba(0, 191, 255, 0.8); }
-        .neon-text-red { text-shadow: 0 0 8px rgba(255, 65, 54, 0.8); }
-        .rotate-180 { transform: rotate(180deg); }
-
-        .scan-overlay {
-            position: absolute;
-            inset: 0;
-            border: 2px solid rgba(16, 185, 129, 0.3);
-            pointer-events: none;
-            box-sizing: border-box;
+        /* Neon Efektleri */
+        .neon-shadow-blue {
+            box-shadow: 0 0 15px rgba(0, 191, 255, 0.6);
         }
-        .scan-laser {
-            position: absolute;
-            height: 3px;
-            width: 100%;
-            background: linear-gradient(to right, transparent, #10b981, transparent);
-            box-shadow: 0 0 8px #10b981;
-            animation: scanAnimation 1.5s linear infinite;
+        .neon-shadow-red {
+            box-shadow: 0 0 15px rgba(255, 65, 54, 0.6);
         }
-        @keyframes scanAnimation {
-            0% { top: 0%; }
-            50% { top: 100%; }
-            100% { top: 0%; }
+        .neon-text-blue {
+            text-shadow: 0 0 8px rgba(0, 191, 255, 0.8);
+        }
+        .neon-text-red {
+            text-shadow: 0 0 8px rgba(255, 65, 54, 0.8);
+        }
+        /* Üst Oyuncu için 180 derece döndürme (Telefonu karşılıklı tutmak için) */
+        .rotate-180 {
+            transform: rotate(180deg);
         }
     </style>
 </head>
 <body class="w-screen h-screen flex flex-col justify-between items-center text-white select-none">
 
-    <!-- SES SENTEZLEYİCİ -->
+    <!-- SES SENTEZLEYİCİ (Harici ses dosyası gerekmez) -->
     <script>
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         let audioCtx = null;
-        function initAudio() { if (!audioCtx) { audioCtx = new AudioCtx(); } }
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioCtx();
+            }
+        }
+
         function playSound(type) {
             if (!audioCtx) return;
             try {
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
-                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
                 if (type === 'laser') {
-                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-                    osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
                 } else if (type === 'explosion') {
-                    osc.type = 'triangle'; osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.4);
-                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-                    osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
                 } else if (type === 'hit') {
-                    osc.type = 'square'; osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.1);
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
                 } else if (type === 'powerup') {
-                    osc.type = 'sine'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
                 }
-            } catch (e) { console.log("Ses hatası", e); }
+            } catch (e) {
+                console.log("Ses çalınamadı", e);
+            }
         }
     </script>
 
-    <!-- TOAST MESAJ KUTUSU -->
-    <div id="toast-message" class="hidden fixed top-6 z-50 bg-slate-900 border border-indigo-500 text-indigo-300 px-4 py-2 rounded-xl shadow-lg text-sm font-semibold transition-all"></div>
-    <script>
-        function showToast(msg) {
-            const toast = document.getElementById('toast-message');
-            toast.innerText = msg; toast.classList.remove('hidden');
-            setTimeout(() => { toast.classList.add('hidden'); }, 3000);
-        }
-    </script>
-
-    <!-- ANA GİRİŞ & MENÜ EKRANI -->
-    <div id="start-screen" class="absolute inset-0 bg-slate-950 flex flex-col justify-center items-center z-40 p-4 text-center overflow-y-auto">
-        <h1 class="text-4xl md:text-5xl font-extrabold mb-1 tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-red-500 font-sans">
+    <!-- GİRİŞ & MENÜ EKRANI -->
+    <div id="start-screen" class="absolute inset-0 bg-slate-950 flex flex-col justify-center items-center z-50 p-6 text-center">
+        <h1 class="text-4xl md:text-5xl font-extrabold mb-2 tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-red-500">
             NEON SAVAŞLARI
         </h1>
-        <p class="text-[10px] text-slate-400 mb-6 uppercase tracking-wider">Uzay Gemisi Düellosu</p>
+        <p class="text-xs md:text-sm text-slate-400 mb-8">TEK TELEFONDA KARŞILIKLI ÇIFTE MÜCADELE</p>
 
-        <!-- KULÜP DURUM BARININ ÜST BAŞLIĞI -->
-        <div id="club-status-bar" class="hidden w-full max-w-sm mb-4 bg-indigo-950/40 border border-indigo-500/30 p-2.5 rounded-xl flex items-center justify-between text-xs">
-            <span class="font-bold text-indigo-400"><i class="fas fa-shield-alt mr-1"></i> Kulübe Bak</span>
-            <button onclick="openClubModal()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 rounded-md font-extrabold text-[11px] transition-all">Yönet / İncele</button>
-        </div>
-
-        <!-- Mod Seçim Bölümü -->
-        <div class="space-y-4 max-w-sm w-full bg-slate-900/80 p-5 rounded-2xl border border-slate-800 backdrop-blur-md mb-4">
-            <h2 class="text-sm font-bold text-slate-300 tracking-wider">1. OYUN MODUNU SEÇİN</h2>
+        <div class="space-y-6 max-w-sm w-full bg-slate-900/80 p-6 rounded-2xl border border-slate-800 backdrop-blur-md">
+            <h2 class="text-lg font-bold text-slate-300">Nasıl Oynanır?</h2>
+            <div class="flex justify-between items-center gap-4 text-xs">
+                <div class="flex-1 p-3 rounded-lg bg-red-950/40 border border-red-900/50 text-red-300">
+                    <span class="font-bold text-sm block mb-1">KIRMIZI (ÜST)</span>
+                    Ekranın üstündeki tuşları kullan. Yönünü çevir, gazla ve ateş et!
+                </div>
+                <div class="flex-1 p-3 rounded-lg bg-cyan-950/40 border border-cyan-900/50 text-cyan-300">
+                    <span class="font-bold text-sm block mb-1">MAVİ (ALT)</span>
+                    Ekranın altındaki tuşları kullan. Yönünü çevir, gazla ve ateş et!
+                </div>
+            </div>
             
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="setMode('2player')" id="btn-mode-2p" class="p-3 rounded-xl border-2 border-cyan-500 bg-cyan-950/20 text-xs font-bold transition-all active:scale-95">
-                    <i class="fas fa-users text-lg mb-1 block text-cyan-400"></i>
-                    Tek Telefonda<br>2 Kişi
-                </button>
-                <button onclick="setMode('vsbot')" id="btn-mode-bot" class="p-3 rounded-xl border border-slate-700 bg-slate-800/40 text-xs font-bold transition-all active:scale-95 text-slate-400">
-                    <i class="fas fa-robot text-lg mb-1 block text-slate-400"></i>
-                    Yapay Zekaya<br>Karşı (Bot)
-                </button>
+            <div class="text-xs text-yellow-400 flex items-center justify-center gap-1">
+                <i class="fas fa-bolt"></i> Ortada beliren güçlendiricileri topla!
             </div>
 
-            <!-- Normal Hızlı Savaş Butonu -->
-            <button onclick="startGame()" class="w-full mt-2 py-3 bg-gradient-to-r from-cyan-500 to-red-500 text-slate-950 font-extrabold text-base rounded-xl shadow-lg active:scale-95 transition-all">
-                HIZLI SAVAŞI BAŞLAT!
+            <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-red-500 text-slate-950 font-bold text-xl rounded-xl shadow-lg hover:brightness-110 active:scale-95 transition-all">
+                SAVAŞI BAŞLAT!
             </button>
         </div>
-
-        <!-- QR Kod Seçim Bölümü -->
-        <div id="qr-options-box" class="space-y-3 max-w-sm w-full bg-slate-900/80 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
-            <h2 class="text-xs font-bold text-slate-400 tracking-wider">2. QR KULÜP SEÇENEKLERİ</h2>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <button onclick="generateQRCode()" class="py-2.5 bg-indigo-950/50 border border-indigo-500/50 text-indigo-300 rounded-lg font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
-                    <i class="fas fa-qrcode text-base"></i>
-                    Kulüp Kur (QR Üret)
-                </button>
-                <button onclick="startQRScanner()" class="py-2.5 bg-emerald-950/50 border border-emerald-500/50 text-emerald-300 rounded-lg font-bold flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
-                    <i class="fas fa-camera text-base"></i>
-                    Kulübe Katıl (QR Oku)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- KULÜP YÖNETİM MODALI (KULÜBE BAK PENCERESİ) -->
-    <div id="club-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-4">
-        <div class="bg-slate-900 border border-indigo-500/50 rounded-2xl p-5 max-w-sm w-full space-y-4 relative">
-            
-            <!-- Çarpı (X) Butonu - Kulüpten Ayrılmadan Sadece Pencereyi Kapatır -->
-            <button onclick="closeClubModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg transition-all focus:outline-none">
-                <i class="fas fa-times"></i>
-            </button>
-
-            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-                <h3 class="font-bold text-indigo-400 flex items-center gap-2"><i class="fas fa-users-cog"></i> Kulüp Odası</h3>
-                <span id="club-id-tag" class="bg-slate-800 text-[10px] font-mono px-2 py-0.5 rounded text-slate-300">ODA: #7821</span>
-            </div>
-
-            <!-- Kaç Tur Olacak Ayarı -->
-            <div class="space-y-2">
-                <label class="text-xs text-slate-400 block text-left font-semibold">Hedef Tur Sayısı:</label>
-                <div class="grid grid-cols-4 gap-1.5">
-                    <button onclick="setTargetRounds(1)" id="round-btn-1" class="py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 text-slate-400">1 Tur</button>
-                    <button onclick="setTargetRounds(3)" id="round-btn-3" class="py-1.5 rounded-lg text-xs font-bold border-2 border-indigo-500 bg-indigo-950/30 text-white">3 Tur</button>
-                    <button onclick="setTargetRounds(5)" id="round-btn-5" class="py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 text-slate-400">5 Tur</button>
-                    <button onclick="setTargetRounds(10)" id="round-btn-10" class="py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 text-slate-400">10 Tur</button>
-                </div>
-            </div>
-
-            <!-- Bağlı Cihazlar Listesi -->
-            <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-2 text-left">
-                <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Kulüpteki Oyuncular</span>
-                <div class="flex items-center justify-between text-xs py-1 border-b border-slate-900/50">
-                    <span class="text-cyan-400 font-medium"><i class="fas fa-mobile-alt mr-1.5"></i> Cihaz-1 (Siz)</span>
-                    <span class="text-[10px] bg-cyan-950 text-cyan-400 px-1.5 py-0.5 rounded">Lider</span>
-                </div>
-                <div id="club-guest-row" class="flex items-center justify-between text-xs py-1">
-                    <span class="text-red-400 font-medium"><i class="fas fa-mobile-alt mr-1.5"></i> Cihaz-2 (Bağlandı)</span>
-                    <span class="text-[10px] bg-red-950 text-red-400 px-1.5 py-0.5 rounded">Hazır</span>
-                </div>
-            </div>
-
-            <!-- Oyun Oynamaya Başla ve Kulüpten Ayrıl Butonları -->
-            <div class="space-y-2 pt-2">
-                <button onclick="startClubGame()" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm rounded-xl shadow-lg transition-all active:scale-95">
-                    <i class="fas fa-play mr-1.5"></i> Oyun Oynamaya Başla!
-                </button>
-                <button onclick="leaveClub()" class="w-full py-2 bg-red-950/20 hover:bg-red-900/30 border border-red-500/30 text-red-400 font-bold text-xs rounded-xl transition-all">
-                    Kulüpten Ayrıl (Odayı Dağıt)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- QR GENERATOR MODAL -->
-    <div id="qr-gen-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-6 text-center">
-        <div class="bg-slate-900 p-6 rounded-2xl border border-indigo-500/50 max-w-xs w-full flex flex-col items-center">
-            <h3 class="text-base font-bold mb-2 text-indigo-400">Kulüp Kuruldu!</h3>
-            <p class="text-[10px] text-slate-400 mb-4">Diğer telefon bu kodu taratarak odayaya anında bağlanabilir.</p>
-            <div id="qrcode-area" class="bg-white p-5 rounded-xl mb-4 border-4 border-indigo-500"></div>
-            <button onclick="closeQRGen()" class="w-full py-2 bg-indigo-600 font-bold text-xs rounded-lg transition-all active:scale-95">
-                Kulübe Git (Paneli Aç)
-            </button>
-        </div>
-    </div>
-
-    <!-- QR CAMERA SCANNER DIALOG -->
-    <div id="qr-scan-modal" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-4 text-center">
-        <div class="bg-slate-900 p-4 rounded-2xl border border-emerald-500/50 max-w-sm w-full flex flex-col items-center">
-            <h3 class="text-base font-bold mb-1 text-emerald-400">Kulüp Kodunu Tara</h3>
-            <p class="text-[10px] text-slate-400 mb-3">Kodu yeşil alan içerisine getirin.</p>
-            
-            <div id="scanner-view" class="w-full aspect-square bg-black rounded-xl overflow-hidden mb-4 relative border-2 border-emerald-500/30">
-                <div class="scan-overlay">
-                    <div class="scan-laser"></div>
-                    <div class="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-emerald-400"></div>
-                    <div class="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-emerald-400"></div>
-                    <div class="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-emerald-400"></div>
-                    <div class="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-emerald-400"></div>
-                </div>
-            </div>
-            <button onclick="stopQRScanner()" class="w-full py-2 bg-slate-800 text-xs font-bold rounded-lg active:scale-95">Kamerayı Kapat</button>
-        </div>
+        <p class="absolute bottom-4 text-slate-600 text-[10px]">Cihazınızı yatay değil, dikey tutarak oynayınız.</p>
     </div>
 
     <!-- OYUN BİTTİ EKRANI -->
     <div id="gameover-screen" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-6 text-center">
-        <div id="winner-box" class="p-8 rounded-2xl border max-w-sm w-full font-sans">
-            <h2 id="winner-text" class="text-3xl font-extrabold mb-2 text-white">MAVİ KAZANDI!</h2>
-            <p id="winner-subtext" class="text-xs text-slate-400 mb-6">Seri turlar devam ediyor.</p>
-            
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="restartGame()" class="py-3 bg-white text-slate-950 font-extrabold text-xs rounded-xl active:scale-95 transition-all">
-                    Tekrar Oyna
-                </button>
-                <button onclick="quitToClubMenu()" class="py-3 bg-slate-800 text-slate-300 font-bold text-xs rounded-xl active:scale-95 transition-all">
-                    Kulübe Dön
-                </button>
-            </div>
+        <div id="winner-box" class="p-8 rounded-2xl border max-w-sm w-full">
+            <h2 id="winner-text" class="text-3xl font-extrabold mb-4">OYUNCU KAZANDI!</h2>
+            <p id="winner-subtext" class="text-sm text-slate-400 mb-6">Karşı rakibini darmadağın etti.</p>
+            <button onclick="restartGame()" class="w-full py-3 bg-white text-slate-950 font-bold rounded-xl active:scale-95 transition-all">
+                Yeniden Oyna
+            </button>
         </div>
     </div>
 
-    <!-- ÜST OYUNCU KONTROL PANELİ (Kırmızı - 180 derece dönük) -->
-    <div id="p2-control-panel" class="w-full h-1/4 bg-slate-950/80 border-b border-red-900/30 flex flex-col justify-between p-3 rotate-180 font-sans">
+    <!-- ÜST OYUNCU KONTROL PANELİ (180 derece dönük - Kırmızı) -->
+    <div class="w-full h-1/4 bg-slate-950/80 border-b border-red-900/30 flex flex-col justify-between p-3 rotate-180">
+        <!-- Oyuncu Bilgileri -->
         <div class="flex justify-between items-center w-full">
             <div class="flex flex-col items-start">
-                <span id="p2-label" class="text-xs font-bold text-red-500 neon-text-red">KIRMIZI OYUNCU</span>
-                <div class="flex gap-1 mt-1" id="p2-hearts"></div>
+                <span class="text-xs font-bold text-red-500 neon-text-red">KIRMIZI OYUNCU</span>
+                <div class="flex gap-1 mt-1" id="p2-hearts">
+                    <i class="fas fa-heart text-red-500 text-xs"></i>
+                    <i class="fas fa-heart text-red-500 text-xs"></i>
+                    <i class="fas fa-heart text-red-500 text-xs"></i>
+                </div>
             </div>
             <div class="text-right">
-                <div class="text-[10px] text-slate-400">SERİ SKOR</div>
+                <div class="text-[10px] text-slate-400">SKOR</div>
                 <div class="text-xl font-bold text-red-500" id="p2-score">0</div>
             </div>
         </div>
 
-        <div id="p2-action-buttons" class="flex justify-between items-center w-full gap-4 mt-2">
+        <!-- Kontrol Butonları -->
+        <div class="flex justify-between items-center w-full gap-4 mt-2">
+            <!-- Sol: Yön Çevirme -->
             <div class="flex gap-2">
-                <button id="p2-btn-left" class="touch-btn w-14 h-14 bg-red-950/40 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 neon-shadow-red"><i class="fas fa-undo text-xl"></i></button>
-                <button id="p2-btn-right" class="touch-btn w-14 h-14 bg-red-950/40 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 neon-shadow-red"><i class="fas fa-redo text-xl"></i></button>
+                <button id="p2-btn-left" class="touch-btn w-14 h-14 bg-red-950/40 active:bg-red-900/80 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 active:scale-90 transition-all neon-shadow-red">
+                    <i class="fas fa-undo text-xl"></i>
+                </button>
+                <button id="p2-btn-right" class="touch-btn w-14 h-14 bg-red-950/40 active:bg-red-900/80 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 active:scale-90 transition-all neon-shadow-red">
+                    <i class="fas fa-redo text-xl"></i>
+                </button>
             </div>
+            <!-- Sağ: Gaz ve Ateş -->
             <div class="flex gap-2">
-                <button id="p2-btn-shoot" class="touch-btn w-16 h-14 bg-red-600 border border-red-400 rounded-2xl flex items-center justify-center text-slate-950 font-bold"><i class="fas fa-crosshairs text-xl"></i></button>
-                <button id="p2-btn-thrust" class="touch-btn w-14 h-14 bg-red-950/40 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 neon-shadow-red"><i class="fas fa-rocket text-xl"></i></button>
+                <button id="p2-btn-shoot" class="touch-btn w-16 h-14 bg-red-600 active:bg-red-500 border border-red-400 rounded-2xl flex items-center justify-center text-slate-950 font-bold active:scale-90 transition-all">
+                    <i class="fas fa-crosshairs text-xl"></i>
+                </button>
+                <button id="p2-btn-thrust" class="touch-btn w-14 h-14 bg-red-950/40 active:bg-red-900/80 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 active:scale-90 transition-all neon-shadow-red">
+                    <i class="fas fa-rocket text-xl"></i>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- ORTAK OYUN ALANI (Canvas) -->
+    <!-- ORTAK OYUN ALANI (Ortadaki Canvas) -->
     <div class="relative w-full flex-grow bg-slate-900 overflow-hidden">
         <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+        
+        <!-- Duraklatma / Skor Durumu (Ortada minimal çizgiler) -->
         <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div class="w-full border-t border-dashed border-slate-700/50"></div>
         </div>
     </div>
 
     <!-- ALT OYUNCU KONTROL PANELİ (Düz - Mavi) -->
-    <div class="w-full h-1/4 bg-slate-950/80 border-t border-cyan-900/30 flex flex-col justify-between p-3 font-sans">
+    <div class="w-full h-1/4 bg-slate-950/80 border-t border-cyan-900/30 flex flex-col justify-between p-3">
+        <!-- Kontrol Butonları -->
         <div class="flex justify-between items-center w-full gap-4 mb-2">
+            <!-- Sol: Yön Çevirme -->
             <div class="flex gap-2">
-                <button id="p1-btn-left" class="touch-btn w-14 h-14 bg-cyan-950/40 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 neon-shadow-blue"><i class="fas fa-undo text-xl"></i></button>
-                <button id="p1-btn-right" class="touch-btn w-14 h-14 bg-cyan-950/40 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 neon-shadow-blue"><i class="fas fa-redo text-xl"></i></button>
+                <button id="p1-btn-left" class="touch-btn w-14 h-14 bg-cyan-950/40 active:bg-cyan-900/80 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 active:scale-90 transition-all neon-shadow-blue">
+                    <i class="fas fa-undo text-xl"></i>
+                </button>
+                <button id="p1-btn-right" class="touch-btn w-14 h-14 bg-cyan-950/40 active:bg-cyan-900/80 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 active:scale-90 transition-all neon-shadow-blue">
+                    <i class="fas fa-redo text-xl"></i>
+                </button>
             </div>
+            <!-- Sağ: Gaz ve Ateş -->
             <div class="flex gap-2">
-                <button id="p1-btn-shoot" class="touch-btn w-16 h-14 bg-cyan-500 border border-cyan-300 rounded-2xl flex items-center justify-center text-slate-950 font-bold"><i class="fas fa-crosshairs text-xl"></i></button>
-                <button id="p1-btn-thrust" class="touch-btn w-14 h-14 bg-cyan-950/40 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 neon-shadow-blue"><i class="fas fa-rocket text-xl"></i></button>
+                <button id="p1-btn-shoot" class="touch-btn w-16 h-14 bg-cyan-500 active:bg-cyan-400 border border-cyan-300 rounded-2xl flex items-center justify-center text-slate-950 font-bold active:scale-90 transition-all">
+                    <i class="fas fa-crosshairs text-xl"></i>
+                </button>
+                <button id="p1-btn-thrust" class="touch-btn w-14 h-14 bg-cyan-950/40 active:bg-cyan-900/80 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 active:scale-90 transition-all neon-shadow-blue">
+                    <i class="fas fa-rocket text-xl"></i>
+                </button>
             </div>
         </div>
 
+        <!-- Oyuncu Bilgileri -->
         <div class="flex justify-between items-center w-full">
             <div class="flex flex-col items-start">
-                <span class="text-xs font-bold text-cyan-400 neon-text-blue">MAVİ OYUNCU (SİZ)</span>
-                <div class="flex gap-1 mt-1" id="p1-hearts"></div>
+                <span class="text-xs font-bold text-cyan-400 neon-text-blue">MAVİ OYUNCU</span>
+                <div class="flex gap-1 mt-1" id="p1-hearts">
+                    <i class="fas fa-heart text-cyan-400 text-xs"></i>
+                    <i class="fas fa-heart text-cyan-400 text-xs"></i>
+                    <i class="fas fa-heart text-cyan-400 text-xs"></i>
+                </div>
             </div>
             <div class="text-right">
-                <div class="text-[10px] text-slate-400">SERİ SKOR</div>
+                <div class="text-[10px] text-slate-400">SKOR</div>
                 <div class="text-xl font-bold text-cyan-400" id="p1-score">0</div>
             </div>
         </div>
     </div>
 
-    <!-- OYUN FİZİĞİ, ODA YÖNETİMİ VE TÜM SİSTEM SCRIPTİ -->
+    <!-- OYUN MOTORU & FİZİK KODLARI -->
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Mobil cihaz boyutuna göre dinamik canvas boyutlandırması
         function resizeCanvas() {
             const rect = canvas.parentElement.getBoundingClientRect();
-            canvas.width = rect.width; canvas.height = rect.height;
+            canvas.width = rect.width;
+            canvas.height = rect.height;
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
-        // KULÜP SİSTEMİ DURUM DEĞİŞKENLERİ
-        let isInClub = false;
-        let targetRounds = 3; 
-        let currentClubId = null;
-        let isGuestConnected = false;
-
-        let gameMode = '2player';
+        // Oyun Durumu
         let gameRunning = false;
         let p1Score = 0;
         let p2Score = 0;
 
+        // Kontrol Durumları (Tuşlara basılma durumları)
         const inputs = {
             p1: { left: false, right: false, thrust: false, shoot: false, lastShoot: 0 },
             p2: { left: false, right: false, thrust: false, shoot: false, lastShoot: 0 }
         };
 
-        // Gemi Sınıfı
+        // Gemi Yapısı
         class Ship {
             constructor(x, y, color, angle, id) {
-                this.id = id; this.x = x; this.y = y; this.color = color; this.angle = angle;
-                this.vx = 0; this.vy = 0; this.radius = 18; this.maxHp = 3; this.hp = 3;
-                this.shield = 0; this.tripleShot = 0;
+                this.id = id;
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.angle = angle; // Radyan cinsinden
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = 18;
+                this.maxHp = 3;
+                this.hp = 3;
+                this.shield = 0; // Kalkan süresi (frame)
+                this.tripleShot = 0; // Üçlü atış süresi (frame)
+                this.speedMultiplier = 1;
             }
+
             draw() {
-                ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                // Kalkan Görseli
                 if (this.shield > 0) {
-                    ctx.beginPath(); ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
                     ctx.strokeStyle = this.color === 'blue' ? '#38bdf8' : '#ef4444';
-                    ctx.lineWidth = 2; ctx.stroke();
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = this.color === 'blue' ? '#38bdf8' : '#ef4444';
+                    ctx.shadowBlur = 10;
+                    ctx.stroke();
                 }
-                ctx.beginPath(); ctx.moveTo(this.radius, 0); ctx.lineTo(-this.radius, -this.radius * 0.8);
-                ctx.lineTo(-this.radius * 0.5, 0); ctx.lineTo(-this.radius, this.radius * 0.8); ctx.closePath();
-                ctx.fillStyle = '#0f172a'; ctx.fill();
+
+                // Gemi Çizimi (Neon Üçgen Savaşçı)
+                ctx.beginPath();
+                ctx.moveTo(this.radius, 0);
+                ctx.lineTo(-this.radius, -this.radius * 0.8);
+                ctx.lineTo(-this.radius * 0.5, 0);
+                ctx.lineTo(-this.radius, this.radius * 0.8);
+                ctx.closePath();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
                 ctx.strokeStyle = this.color === 'blue' ? '#00bfff' : '#ff4136';
-                ctx.lineWidth = 3; ctx.stroke();
+                ctx.lineWidth = 3;
+                ctx.shadowColor = this.strokeStyle;
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+
+                // Kokpit Bölgesi
+                ctx.beginPath();
+                ctx.arc(2, 0, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
                 ctx.restore();
             }
+
             update() {
-                this.x += this.vx; this.y += this.vy; this.vx *= 0.96; this.vy *= 0.96;
+                // Sınırlar içinde tut ve hareket ettir
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Sürtünme kuvveti (yavaşlama)
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+
+                // Ekran Sınırları Çarpışma Kontrolü
                 if (this.x < this.radius) { this.x = this.radius; this.vx *= -0.5; }
                 if (this.x > canvas.width - this.radius) { this.x = canvas.width - this.radius; this.vx *= -0.5; }
+                
+                // Oyuncular kendi yarı alan sınırlarından çıkabilir ama ekran dışına taşamaz
                 if (this.y < this.radius) { this.y = this.radius; this.vy *= -0.5; }
                 if (this.y > canvas.height - this.radius) { this.y = canvas.height - this.radius; this.vy *= -0.5; }
+
+                // Güçlendirici sürelerini düşür
                 if (this.shield > 0) this.shield--;
                 if (this.tripleShot > 0) this.tripleShot--;
             }
+
             takeDamage() {
-                if (this.shield > 0) return false;
-                this.hp--; playSound('hit');
+                if (this.shield > 0) return false; // Kalkan hasarı engelledi
+                this.hp--;
+                playSound('hit');
                 createExplosion(this.x, this.y, this.color, 10);
                 updateHearts(this.id, this.hp);
-                if (this.hp <= 0) { playSound('explosion'); createExplosion(this.x, this.y, this.color, 35); return true; }
+                if (this.hp <= 0) {
+                    playSound('explosion');
+                    createExplosion(this.x, this.y, this.color, 35);
+                    return true; // Gemi yok oldu
+                }
                 return false;
             }
         }
@@ -376,125 +359,361 @@
         // Mermi Sınıfı
         class Bullet {
             constructor(x, y, angle, color, ownerId) {
-                this.x = x; this.y = y;
-                this.vx = Math.cos(angle) * 7; this.vy = Math.sin(angle) * 7;
-                this.radius = 4; this.color = color; this.ownerId = ownerId; this.life = 120;
+                this.x = x;
+                this.y = y;
+                this.vx = Math.cos(angle) * 7;
+                this.vy = Math.sin(angle) * 7;
+                this.radius = 4;
+                this.color = color;
+                this.ownerId = ownerId;
+                this.life = 120; // 2 saniye ömür
             }
+
             draw() {
-                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color === 'blue' ? '#00bfff' : '#ff4136'; ctx.fill();
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color === 'blue' ? '#00bfff' : '#ff4136';
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.restore();
             }
-            update() { this.x += this.vx; this.y += this.vy; this.life--; }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+            }
         }
 
-        // Parçacık Yapısı
+        // Güçlendirici Sınıfı (Yıldızlar)
+        class PowerUp {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'shield', 'triple', 'heal'
+                this.radius = 14;
+                this.angle = 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                
+                let color = '#fbbf24';
+                let icon = '⚡';
+                if (this.type === 'shield') { color = '#38bdf8'; icon = '🛡️'; }
+                if (this.type === 'heal') { color = '#10b981'; icon = '❤️'; }
+                if (this.type === 'triple') { color = '#ec4899'; icon = '🔥'; }
+
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+
+                // İkon Çizimi
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Yazının ters durmaması için sabitleme
+                ctx.fillText(icon, 0, 0);
+
+                ctx.restore();
+                this.angle += 0.02;
+            }
+        }
+
+        // Efekt Parçacıkları (Patlamalar için)
         class Particle {
             constructor(x, y, color) {
-                this.x = x; this.y = y;
-                this.color = color === 'blue' ? '#00bfff' : '#ff4136';
-                this.vx = (Math.random() - 0.5) * 6; this.vy = (Math.random() - 0.5) * 6;
-                this.radius = Math.random() * 3 + 1; this.life = Math.random() * 30 + 10;
+                this.x = x;
+                this.y = y;
+                this.color = color === 'blue' ? '#00bfff' : (color === 'red' ? '#ff4136' : '#fbbf24');
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.radius = Math.random() * 3 + 1;
+                this.life = Math.random() * 30 + 10;
                 this.maxLife = this.life;
             }
+
             draw() {
-                ctx.save(); ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fillStyle = this.color; ctx.globalAlpha = this.life / this.maxLife; ctx.fill(); ctx.restore();
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life / this.maxLife;
+                ctx.fill();
+                ctx.restore();
             }
-            update() { this.x += this.vx; this.y += this.vy; this.life--; }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+            }
         }
 
+        // Nesne Listeleri
         let p1, p2;
         let bullets = [];
+        let powerups = [];
         let particles = [];
+        let powerupTimer = 0;
 
         function initGameObjects() {
             p1 = new Ship(canvas.width / 2, canvas.height - 60, 'blue', -Math.PI / 2, 1);
             p2 = new Ship(canvas.width / 2, 60, 'red', Math.PI / 2, 2);
-            bullets = []; particles = [];
-            updateHearts(1, p1.hp); updateHearts(2, p2.hp);
+            bullets = [];
+            powerups = [];
+            particles = [];
+            powerupTimer = 0;
+            
+            // Canları Sıfırla
+            updateHearts(1, p1.hp);
+            updateHearts(2, p2.hp);
         }
 
         function createExplosion(x, y, color, count = 15) {
-            for (let i = 0; i < count; i++) { particles.push(new Particle(x, y, color)); }
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
         }
 
+        function spawnPowerUp() {
+            const types = ['shield', 'triple', 'heal'];
+            const randType = types[Math.floor(Math.random() * types.length)];
+            // Ortadaki dar bir bölgede spawn et (iki oyuncunun da erişebileceği yer)
+            const rx = Math.random() * (canvas.width - 60) + 30;
+            const ry = Math.random() * (canvas.height * 0.4) + (canvas.height * 0.3);
+            powerups.push(new PowerUp(rx, ry, randType));
+            playSound('powerup');
+        }
+
+        // Kalpleri Güncelleme Fonksiyonu
         function updateHearts(playerId, hp) {
             const container = document.getElementById(`p${playerId}-hearts`);
             container.innerHTML = '';
             const colorClass = playerId === 1 ? 'text-cyan-400' : 'text-red-500';
             for (let i = 0; i < 3; i++) {
-                if (i < hp) container.innerHTML += `<i class="fas fa-heart ${colorClass} text-xs"></i>`;
-                else container.innerHTML += `<i class="far fa-heart text-slate-600 text-xs"></i>`;
+                if (i < hp) {
+                    container.innerHTML += `<i class="fas fa-heart ${colorClass} text-xs"></i>`;
+                } else {
+                    container.innerHTML += `<i class="far fa-heart text-slate-600 text-xs"></i>`;
+                }
             }
         }
 
+        // Ateş Etme Fonksiyonu
         function fireBullet(ship) {
             const now = Date.now();
             const inputState = ship.id === 1 ? inputs.p1 : inputs.p2;
-            if (now - inputState.lastShoot < 300) return;
+            
+            if (now - inputState.lastShoot < 300) return; // Ateş hızı sınırı (300ms)
             inputState.lastShoot = now;
+
             playSound('laser');
-            bullets.push(new Bullet(ship.x, ship.y, ship.angle, ship.color, ship.id));
-        }
 
-        function updateBotAI() {
-            if (gameMode !== 'vsbot') return;
-            const dx = p1.x - p2.x; const dy = p1.y - p2.y;
-            const targetAngle = Math.atan2(dy, dx);
-            let angleDiff = targetAngle - p2.angle;
-            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-            if (Math.abs(angleDiff) > 0.05) p2.angle += Math.sign(angleDiff) * 0.05;
-            if (Math.hypot(dx, dy) > 150 && Math.random() < 0.2) {
-                p2.vx += Math.cos(p2.angle) * 0.15; p2.vy += Math.sin(p2.angle) * 0.15;
+            if (ship.tripleShot > 0) {
+                // Üçlü Atış Güçlendiricisi
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle, ship.color, ship.id));
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle - 0.25, ship.color, ship.id));
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle + 0.25, ship.color, ship.id));
+            } else {
+                // Normal Tekli Atış
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle, ship.color, ship.id));
             }
-            if (Math.abs(angleDiff) < 0.4 && Math.random() < 0.07) fireBullet(p2);
         }
 
+        // Dokunmatik Kontroller için Listenerlar
+        function setupTouchControls() {
+            const touchMappings = [
+                { id: 'p1-btn-left', player: 'p1', action: 'left' },
+                { id: 'p1-btn-right', player: 'p1', action: 'right' },
+                { id: 'p1-btn-thrust', player: 'p1', action: 'thrust' },
+                { id: 'p1-btn-shoot', player: 'p1', action: 'shoot' },
+                
+                { id: 'p2-btn-left', player: 'p2', action: 'left' },
+                { id: 'p2-btn-right', player: 'p2', action: 'right' },
+                { id: 'p2-btn-thrust', player: 'p2', action: 'thrust' },
+                { id: 'p2-btn-shoot', player: 'p2', action: 'shoot' },
+            ];
+
+            touchMappings.forEach(map => {
+                const btn = document.getElementById(map.id);
+                if (!btn) return;
+
+                const startHandler = (e) => {
+                    e.preventDefault();
+                    initAudio(); // Tarayıcı ses engelini kaldırır
+                    inputs[map.player][map.action] = true;
+                };
+
+                const endHandler = (e) => {
+                    e.preventDefault();
+                    inputs[map.player][map.action] = false;
+                };
+
+                btn.addEventListener('touchstart', startHandler, { passive: false });
+                btn.addEventListener('touchend', endHandler, { passive: false });
+                btn.addEventListener('touchcancel', endHandler, { passive: false });
+
+                // Masaüstü testleri için fare desteği
+                btn.addEventListener('mousedown', startHandler);
+                btn.addEventListener('mouseup', endHandler);
+                btn.addEventListener('mouseleave', endHandler);
+            });
+        }
+
+        // İki Çember Arasındaki Mesafe Kontrolü
+        function checkCollision(c1, c2) {
+            const dx = c1.x - c2.x;
+            const dy = c1.y - c2.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist < c1.radius + c2.radius;
+        }
+
+        // Oyun Döngüsü
         function gameLoop() {
             if (!gameRunning) return;
-            ctx.fillStyle = 'rgba(13, 14, 21, 0.4)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Arka Planı Temizle (Neon efektler için hafif iz bırakarak)
+            ctx.fillStyle = 'rgba(13, 14, 21, 0.4)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Güçlendirici Çıkarma Zamanlayıcısı
+            powerupTimer++;
+            if (powerupTimer > 400) { // Yaklaşık 6-7 saniyede bir
+                if (powerups.length < 2) spawnPowerUp();
+                powerupTimer = 0;
+            }
+
+            // Girdi İşleme - Oyuncu 1 (Mavi)
             if (inputs.p1.left) p1.angle -= 0.05;
             if (inputs.p1.right) p1.angle += 0.05;
-            if (inputs.p1.thrust) { p1.vx += Math.cos(p1.angle) * 0.15; p1.vy += Math.sin(p1.angle) * 0.15; }
+            if (inputs.p1.thrust) {
+                p1.vx += Math.cos(p1.angle) * 0.15;
+                p1.vy += Math.sin(p1.angle) * 0.15;
+                // Egzoz kıvılcımları üret
+                if (Math.random() < 0.4) {
+                    particles.push(new Particle(p1.x - Math.cos(p1.angle)*15, p1.y - Math.sin(p1.angle)*15, 'blue'));
+                }
+            }
             if (inputs.p1.shoot) fireBullet(p1);
 
-            if (gameMode === '2player') {
-                if (inputs.p2.left) p2.angle -= 0.05;
-                if (inputs.p2.right) p2.angle += 0.05;
-                if (inputs.p2.thrust) { p2.vx += Math.cos(p2.angle) * 0.15; p2.vy += Math.sin(p2.angle) * 0.15; }
-                if (inputs.p2.shoot) fireBullet(p2);
-            } else { updateBotAI(); }
+            // Girdi İşleme - Oyuncu 2 (Kırmızı)
+            if (inputs.p2.left) p2.angle -= 0.05;
+            if (inputs.p2.right) p2.angle += 0.05;
+            if (inputs.p2.thrust) {
+                p2.vx += Math.cos(p2.angle) * 0.15;
+                p2.vy += Math.sin(p2.angle) * 0.15;
+                // Egzoz kıvılcımları üret
+                if (Math.random() < 0.4) {
+                    particles.push(new Particle(p2.x - Math.cos(p2.angle)*15, p2.y - Math.sin(p2.angle)*15, 'red'));
+                }
+            }
+            if (inputs.p2.shoot) fireBullet(p2);
 
-            p1.update(); p1.draw();
-            p2.update(); p2.draw();
+            // Gemileri Güncelle ve Çiz
+            p1.update();
+            p1.draw();
 
-            if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < p1.radius + p2.radius) {
-                const tempVx = p1.vx; const tempVy = p1.vy;
-                p1.vx = p2.vx * 1.2; p1.vy = p2.vy * 1.2;
-                p2.vx = tempVx * 1.2; p2.vy = tempVy * 1.2;
+            p2.update();
+            p2.draw();
+
+            // Gemilerin Birbiriyle Çarpışması (Fiziksel İtme)
+            if (checkCollision(p1, p2)) {
+                playSound('hit');
+                createExplosion((p1.x + p2.x)/2, (p1.y + p2.y)/2, 'yellow', 5);
+                // Basit momentum değişimi
+                const tempVx = p1.vx;
+                const tempVy = p1.vy;
+                p1.vx = p2.vx * 1.2;
+                p1.vy = p2.vy * 1.2;
+                p2.vx = tempVx * 1.2;
+                p2.vy = tempVy * 1.2;
             }
 
+            // Mermileri Güncelle ve Çiz
             for (let i = bullets.length - 1; i >= 0; i--) {
-                const b = bullets[i]; b.update(); b.draw();
-                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) { bullets.splice(i, 1); continue; }
-                if (b.ownerId === 2 && Math.hypot(b.x - p1.x, b.y - p1.y) < b.radius + p1.radius) {
-                    bullets.splice(i, 1); if (p1.takeDamage()) endGame(2); continue;
+                const b = bullets[i];
+                b.update();
+                b.draw();
+
+                // Ekran Dışı Kontrolü veya Ömür Bitişi
+                if (b.life <= 0 || b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+                    bullets.splice(i, 1);
+                    continue;
                 }
-                if (b.ownerId === 1 && Math.hypot(b.x - p2.x, b.y - p2.y) < b.radius + p2.radius) {
-                    bullets.splice(i, 1); if (p2.takeDamage()) endGame(1); continue;
+
+                // Mermi Çarpışma Kontrolleri
+                if (b.ownerId === 2 && checkCollision(b, p1)) { // Kırmızı Maviye vurdu
+                    bullets.splice(i, 1);
+                    const destroyed = p1.takeDamage();
+                    if (destroyed) endGame(2); // Kırmızı kazandı
+                    continue;
+                }
+                if (b.ownerId === 1 && checkCollision(b, p2)) { // Mavi Kırmızıya vurdu
+                    bullets.splice(i, 1);
+                    const destroyed = p2.takeDamage();
+                    if (destroyed) endGame(1); // Mavi kazandı
+                    continue;
                 }
             }
 
-            for (let i = particles.length - 1; i >= 0; i--) {
-                particles[i].update(); particles[i].draw();
-                if (particles[i].life <= 0) particles.splice(i, 1);
+            // Güçlendiricileri Güncelle ve Çiz
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const pu = powerups[i];
+                pu.draw();
+
+                // P1'in toplaması
+                if (checkCollision(pu, p1)) {
+                    applyPowerUp(p1, pu.type);
+                    powerups.splice(i, 1);
+                    continue;
+                }
+                // P2'nin toplaması
+                if (checkCollision(pu, p2)) {
+                    applyPowerUp(p2, pu.type);
+                    powerups.splice(i, 1);
+                    continue;
+                }
             }
+
+            // Efektleri Güncelle ve Çiz
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const part = particles[i];
+                part.update();
+                part.draw();
+                if (part.life <= 0) particles.splice(i, 1);
+            }
+
             requestAnimationFrame(gameLoop);
         }
 
-        // Hızlı savaşı başlat
+        // Güçlendiriciyi Aktifleştirme
+        function applyPowerUp(ship, type) {
+            playSound('powerup');
+            createExplosion(ship.x, ship.y, 'yellow', 15);
+            if (type === 'shield') {
+                ship.shield = 400; // Yaklaşık 6-7 saniye kalkan
+            } else if (type === 'triple') {
+                ship.tripleShot = 400; // 3'lü mermi modu
+            } else if (type === 'heal') {
+                ship.hp = Math.min(ship.maxHp, ship.hp + 1);
+                updateHearts(ship.id, ship.hp);
+            }
+        }
+
+        // Oyunu Başlat
         function startGame() {
             initAudio();
             document.getElementById('start-screen').classList.add('hidden');
@@ -503,52 +722,31 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Kulüp üzerinden savaşı başlat
-        function startClubGame() {
-            closeClubModal();
-            startGame();
-        }
-
+        // Oyunu Sonlandır
         function endGame(winnerId) {
             gameRunning = false;
             const screen = document.getElementById('gameover-screen');
             const winnerText = document.getElementById('winner-text');
-            const subtext = document.getElementById('winner-subtext');
-            
-            if (winnerId === 1) {
-                p1Score++; document.getElementById('p1-score').innerText = p1Score;
-                winnerText.innerText = "MAVİ KAZANDI!";
-                winnerText.className = "text-3xl font-extrabold mb-2 text-cyan-400 neon-text-blue";
-            } else {
-                p2Score++; document.getElementById('p2-score').innerText = p2Score;
-                winnerText.innerText = gameMode === 'vsbot' ? "BOT KAZANDI!" : "KIRMIZI KAZANDI!";
-                winnerText.className = "text-3xl font-extrabold mb-2 text-red-500 neon-text-red";
-            }
+            const winnerBox = document.getElementById('winner-box');
 
-            // Seri tur hedef kontrolü
-            if (isInClub) {
-                if (p1Score >= targetRounds) {
-                    winnerText.innerText = "KULÜP ŞAMPİYONU: MAVİ!";
-                    subtext.innerText = `Hedeflenen ${targetRounds} tura başarıyla ulaşıldı!`;
-                    p1Score = 0; p2Score = 0;
-                    document.getElementById('p1-score').innerText = "0";
-                    document.getElementById('p2-score').innerText = "0";
-                } else if (p2Score >= targetRounds) {
-                    winnerText.innerText = gameMode === 'vsbot' ? "KULÜP ŞAMPİYONU: BOT!" : "KULÜP ŞAMPİYONU: KIRMIZI!";
-                    subtext.innerText = `Hedeflenen ${targetRounds} tura başarıyla ulaşıldı!`;
-                    p1Score = 0; p2Score = 0;
-                    document.getElementById('p1-score').innerText = "0";
-                    document.getElementById('p2-score').innerText = "0";
-                } else {
-                    subtext.innerText = `Seri turlar devam ediyor. Hedef: ${targetRounds} Galibiyet`;
-                }
+            if (winnerId === 1) {
+                p1Score++;
+                document.getElementById('p1-score').innerText = p1Score;
+                winnerText.innerText = "MAVİ KAZANDI!";
+                winnerText.className = "text-3xl font-extrabold mb-4 text-cyan-400 neon-text-blue";
+                winnerBox.className = "p-8 rounded-2xl border border-cyan-500/50 bg-slate-900/90 max-w-sm w-full neon-shadow-blue";
             } else {
-                subtext.innerText = "Tek seferlik düello tamamlandı.";
+                p2Score++;
+                document.getElementById('p2-score').innerText = p2Score;
+                winnerText.innerText = "KIRMIZI KAZANDI!";
+                winnerText.className = "text-3xl font-extrabold mb-4 text-red-500 neon-text-red";
+                winnerBox.className = "p-8 rounded-2xl border border-red-500/50 bg-slate-900/90 max-w-sm w-full neon-shadow-red";
             }
 
             screen.classList.remove('hidden');
         }
 
+        // Yeniden Başlat
         function restartGame() {
             document.getElementById('gameover-screen').classList.add('hidden');
             initGameObjects();
@@ -556,153 +754,10 @@
             requestAnimationFrame(gameLoop);
         }
 
-        // Maç bittiğinde kulübe geri dönüş (Skorlar kaybolmaz, kulüp korunur)
-        function quitToClubMenu() {
-            document.getElementById('gameover-screen').classList.add('hidden');
-            document.getElementById('start-screen').classList.remove('hidden');
-            openClubModal(); // Kulüp paneli direkt açılır
-        }
-
-        // --- KULÜP YÖNETİM FONKSİYONLARI ---
-        function generateQRCode() {
-            currentClubId = Math.floor(1000 + Math.random() * 9000);
-            document.getElementById('club-id-tag').innerText = "ODA: #" + currentClubId;
-            
-            const area = document.getElementById('qrcode-area');
-            area.innerHTML = "";
-            
-            // Veri yapısı oda id bilgisini içerir
-            const qrData = JSON.stringify({ clubId: currentClubId, action: 'join-club' });
-            
-            new QRCode(area, {
-                text: qrData, width: 160, height: 160,
-                colorDark : "#0d0e15", colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.M // Daha hızlı okuma için M seviyesi
-            });
-
-            document.getElementById('qr-gen-modal').classList.remove('hidden');
-            setupClubState(true);
-        }
-
-        function closeQRGen() {
-            document.getElementById('qr-gen-modal').classList.add('hidden');
-            openClubModal(); // Doğrudan yönetim modalını aç
-        }
-
-        function setupClubState(active) {
-            isInClub = active;
-            if (active) {
-                isGuestConnected = true;
-                document.getElementById('club-status-bar').classList.remove('hidden');
-                document.getElementById('club-guest-row').classList.remove('hidden');
-                document.getElementById('qr-options-box').classList.add('hidden'); // Yeni oda açma gizlenir
-            } else {
-                isGuestConnected = false;
-                currentClubId = null;
-                p1Score = 0; p2Score = 0;
-                document.getElementById('p1-score').innerText = "0";
-                document.getElementById('p2-score').innerText = "0";
-                document.getElementById('club-status-bar').classList.add('hidden');
-                document.getElementById('qr-options-box').classList.remove('hidden');
-            }
-        }
-
-        function openClubModal() { document.getElementById('club-modal').classList.remove('hidden'); }
-        function closeClubModal() { document.getElementById('club-modal').classList.add('hidden'); }
-
-        function setTargetRounds(rounds) {
-            targetRounds = rounds;
-            [1, 3, 5, 10].forEach(r => {
-                const btn = document.getElementById(`round-btn-${r}`);
-                if (r === rounds) {
-                    btn.className = "py-1.5 rounded-lg text-xs font-bold border-2 border-indigo-500 bg-indigo-950/30 text-white";
-                } else {
-                    btn.className = "py-1.5 rounded-lg text-xs font-bold border border-slate-700 bg-slate-800 text-slate-400";
-                }
-            });
-            showToast(`Maç hedefi ${rounds} Tur olarak güncellendi!`);
-        }
-
-        // KULÜPTEN AYRILMA (Her şeyi sıfırlar ve yeniden oluşturulabilir hale getirir)
-        function leaveClub() {
-            setupClubState(false);
-            closeClubModal();
-            showToast("Kulüpten ayrıldınız. Yeni bir kulüp oluşturabilir veya katılabilirsiniz.");
-        }
-
-        // --- ULTRA HIZLI SCANNER AYARLARI ---
-        let html5QrcodeScanner = null;
-        function startQRScanner() {
-            document.getElementById('qr-scan-modal').classList.remove('hidden');
-            html5QrcodeScanner = new Html5Qrcode("scanner-view");
-            const config = { 
-                fps: 30, // Maksimum okuma hızı için 30 FPS
-                qrbox: function(w, h) { return { width: Math.floor(Math.min(w, h) * 0.8), height: Math.floor(Math.min(w, h) * 0.8) }; },
-                aspectRatio: 1.0
-            };
-            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
-        }
-
-        function onScanSuccess(decodedText) {
-            try {
-                const data = JSON.parse(decodedText);
-                if (data.action === 'join-club') {
-                    playSound('powerup');
-                    currentClubId = data.clubId;
-                    document.getElementById('club-id-tag').innerText = "ODA: #" + currentClubId;
-                    setupClubState(true);
-                    showToast(`Kulübe başarıyla katıldınız! Oda: #${currentClubId}`);
-                    stopQRScanner();
-                    setTimeout(() => {
-                        openClubModal(); // Tarama sonrası doğrudan yönetim panelini aç
-                    }, 500);
-                }
-            } catch (e) {
-                showToast("Bu geçerli bir oyun kulüp kodu değil!");
-                stopQRScanner();
-            }
-        }
-
-        function stopQRScanner() {
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.stop().then(() => { document.getElementById('qr-scan-modal').classList.add('hidden'); })
-                .catch(() => { document.getElementById('qr-scan-modal').classList.add('hidden'); });
-            } else { document.getElementById('qr-scan-modal').classList.add('hidden'); }
-        }
-
-        // Kontrolcü eşleşmeleri
-        function setupTouchControls() {
-            const touchMappings = [
-                { id: 'p1-btn-left', player: 'p1', action: 'left' }, { id: 'p1-btn-right', player: 'p1', action: 'right' },
-                { id: 'p1-btn-thrust', player: 'p1', action: 'thrust' }, { id: 'p1-btn-shoot', player: 'p1', action: 'shoot' },
-                { id: 'p2-btn-left', player: 'p2', action: 'left' }, { id: 'p2-btn-right', player: 'p2', action: 'right' },
-                { id: 'p2-btn-thrust', player: 'p2', action: 'thrust' }, { id: 'p2-btn-shoot', player: 'p2', action: 'shoot' }
-            ];
-            touchMappings.forEach(map => {
-                const btn = document.getElementById(map.id); if (!btn) return;
-                const start = (e) => { e.preventDefault(); initAudio(); if (gameMode === 'vsbot' && map.player === 'p2') return; inputs[map.player][map.action] = true; };
-                const end = (e) => { e.preventDefault(); inputs[map.player][map.action] = false; };
-                btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
-                btn.addEventListener('mousedown', start); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
-            });
-        }
-
-        function setMode(mode) {
-            gameMode = mode;
-            const btn2p = document.getElementById('btn-mode-2p'); const btnBot = document.getElementById('btn-mode-bot');
-            const p2Label = document.getElementById('p2-label'); const p2Actions = document.getElementById('p2-action-buttons');
-            if (mode === '2player') {
-                btn2p.className = "p-3 rounded-xl border-2 border-cyan-500 bg-cyan-950/20 text-xs font-bold text-white";
-                btnBot.className = "p-3 rounded-xl border border-slate-700 bg-slate-800/40 text-xs font-bold text-slate-400";
-                p2Label.innerText = "KIRMIZI OYUNCU"; p2Actions.classList.remove('invisible');
-            } else {
-                btnBot.className = "p-3 rounded-xl border-2 border-red-500 bg-red-950/20 text-xs font-bold text-white";
-                btn2p.className = "p-3 rounded-xl border border-slate-700 bg-slate-800/40 text-xs font-bold text-slate-400";
-                p2Label.innerText = "KIRMIZI OYUNCU (BOT)"; p2Actions.classList.add('invisible');
-            }
-        }
-
-        window.onload = function() { setupTouchControls(); setMode('2player'); };
+        // Sayfa yüklendiğinde kontrolleri hazırla
+        window.onload = function() {
+            setupTouchControls();
+        };
     </script>
 </body>
 </html>
