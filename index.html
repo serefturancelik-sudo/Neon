@@ -1,79 +1,43 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Arena - Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body { background-color: #050505; color: white; touch-action: manipulation; }
-        .skin-card { transition: transform 0.2s; }
-        .skin-card:active { transform: scale(0.95); }
-    </style>
-</head>
-<body class="h-screen flex flex-col overflow-hidden">
-
-    <div id="lobby" class="flex flex-col items-center justify-center h-full p-4 text-center">
-        <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-8">NEON ARENA</h1>
-        <div class="w-full max-w-sm space-y-4">
-            <p class="text-slate-400">Puanın: <span id="main-points" class="text-yellow-400 font-bold">0</span></p>
-            <button onclick="startGame('bot')" class="w-full py-4 bg-red-600 rounded-2xl font-bold shadow-lg shadow-red-900/50">VS BOT</button>
-            <button onclick="startGame('pvp')" class="w-full py-4 bg-cyan-600 rounded-2xl font-bold shadow-lg shadow-cyan-900/50">2 KİŞİLİK (TAKIM)</button>
-            <button onclick="showStore()" class="w-full py-4 bg-purple-700 rounded-2xl font-bold">SKIN MARKET (50+)</button>
-        </div>
+<div id="lobby-screen" class="absolute inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center p-6 text-center">
+    <h1 class="text-4xl font-extrabold mb-8 text-cyan-400">NEON ARENA</h1>
+    <div class="w-full max-w-sm space-y-4">
+        <button onclick="initLobby('bot')" class="w-full py-4 bg-red-600 rounded-xl font-bold border border-red-500 shadow-lg">BOT'A KARŞI OYNA</button>
+        <button onclick="initLobby('pvp')" class="w-full py-4 bg-cyan-600 rounded-xl font-bold border border-cyan-500 shadow-lg">2 KİŞİLİK (TAKIM)</button>
+        <button onclick="alert('Odadan ayrıldın, sayfayı yenile!')" class="w-full py-2 bg-slate-800 text-slate-400 rounded-lg text-xs">ODADAN AYRIL</button>
     </div>
+</div>
 
-    <div id="store" class="hidden flex flex-col h-full p-4 overflow-y-auto">
-        <div class="flex justify-between items-center mb-6 sticky top-0 bg-slate-950 py-2">
-            <button onclick="hideStore()" class="text-cyan-400 font-bold">← GERİ</button>
-            <h2 class="font-bold">Market (Puan: <span id="store-points" class="text-yellow-400">0</span>)</h2>
-        </div>
-        <div id="skin-grid" class="grid grid-cols-4 gap-3"></div>
-    </div>
+<script>
+    let isBotMode = false;
 
-    <canvas id="gameCanvas" class="hidden w-full h-full bg-slate-900"></canvas>
+    function initLobby(mode) {
+        isBotMode = (mode === 'bot');
+        document.getElementById('lobby-screen').classList.add('hidden');
+        startGame(); // Mevcut oyununu başlatır
+    }
 
-    <script>
-        // Veri
-        let points = parseInt(localStorage.getItem('points')) || 100;
+    // Oyun döngüsü içine Bot mantığını ekleyelim
+    function updateBot() {
+        if (!isBotMode || !gameRunning) return;
         
-        // Marketi Yükle
-        const grid = document.getElementById('skin-grid');
-        for(let i=1; i<=50; i++) {
-            grid.innerHTML += `
-                <div class="skin-card bg-slate-800 p-2 text-center rounded-xl border border-slate-700">
-                    <div class="text-[9px] mb-1">SKIN ${i}</div>
-                    <button onclick="buySkin(${i})" class="bg-green-600 w-full py-1 text-[10px] rounded-lg font-bold">${i*10}P</button>
-                </div>
-            `;
-        }
-
-        function buySkin(id) {
-            let price = id * 10;
-            if (points >= price) {
-                points -= price;
-                localStorage.setItem('points', points);
-                updateUI();
-                alert("Skin " + id + " başarıyla alındı!");
-            } else { alert("Puanın yetersiz!"); }
-        }
-
-        function updateUI() {
-            document.getElementById('main-points').innerText = points;
-            document.getElementById('store-points').innerText = points;
-        }
-
-        function showStore() { document.getElementById('lobby').classList.add('hidden'); document.getElementById('store').classList.remove('hidden'); }
-        function hideStore() { document.getElementById('lobby').classList.remove('hidden'); document.getElementById('store').classList.add('hidden'); }
+        // Basit Bot: Kırmızı gemi (p2) Mavi gemiyi (p1) takip eder
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        const targetAngle = Math.atan2(dy, dx);
         
-        function startGame(mode) {
-            document.getElementById('lobby').classList.add('hidden');
-            document.getElementById('gameCanvas').classList.remove('hidden');
-            // Oyun motoru kodların buraya gelecek
-            console.log("Oyun başladı: " + mode);
+        // Açıyı yakala
+        if (Math.abs(p2.angle - targetAngle) > 0.1) {
+            p2.angle += (p2.angle < targetAngle) ? 0.05 : -0.05;
         }
+        
+        // Harekete geç
+        p2.vx += Math.cos(p2.angle) * 0.1;
+        p2.vy += Math.sin(p2.angle) * 0.1;
+        
+        // Rastgele ateş et
+        if (Math.random() < 0.03) fireBullet(p2);
+    }
 
-        updateUI();
-    </script>
-</body>
-</html>
+    // gameLoop fonksiyonunun içine şunu ekle:
+    // updateBot(); // <-- Buraya yaz
+</script>
