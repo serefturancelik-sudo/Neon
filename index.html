@@ -3,93 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Savaşları - Gelişmiş</title>
+    <title>Neon Arena - Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { user-select: none; touch-action: none; overflow: hidden; background-color: #0d0e15; color: white; }
-        .touch-btn { touch-action: manipulation; }
+        body { background-color: #050505; color: white; touch-action: manipulation; }
+        .skin-card { transition: transform 0.2s; }
+        .skin-card:active { transform: scale(0.95); }
     </style>
 </head>
-<body class="w-screen h-screen flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <div id="menu" class="absolute inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center p-6 text-center">
-        <h1 class="text-4xl font-bold mb-8 text-cyan-400">NEON SAVAŞLARI</h1>
-        <div class="flex gap-4">
-            <button onclick="startGame(false)" class="p-6 bg-cyan-900 rounded-xl border border-cyan-500">İNSAN VS İNSAN</button>
-            <button onclick="startGame(true)" class="p-6 bg-red-900 rounded-xl border border-red-500">İNSAN VS BOT</button>
+    <div id="lobby" class="flex flex-col items-center justify-center h-full p-4 text-center">
+        <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 mb-8">NEON ARENA</h1>
+        <div class="w-full max-w-sm space-y-4">
+            <p class="text-slate-400">Puanın: <span id="main-points" class="text-yellow-400 font-bold">0</span></p>
+            <button onclick="startGame('bot')" class="w-full py-4 bg-red-600 rounded-2xl font-bold shadow-lg shadow-red-900/50">VS BOT</button>
+            <button onclick="startGame('pvp')" class="w-full py-4 bg-cyan-600 rounded-2xl font-bold shadow-lg shadow-cyan-900/50">2 KİŞİLİK (TAKIM)</button>
+            <button onclick="showStore()" class="w-full py-4 bg-purple-700 rounded-2xl font-bold">SKIN MARKET (50+)</button>
         </div>
     </div>
 
-    <canvas id="gameCanvas" class="flex-grow"></canvas>
+    <div id="store" class="hidden flex flex-col h-full p-4 overflow-y-auto">
+        <div class="flex justify-between items-center mb-6 sticky top-0 bg-slate-950 py-2">
+            <button onclick="hideStore()" class="text-cyan-400 font-bold">← GERİ</button>
+            <h2 class="font-bold">Market (Puan: <span id="store-points" class="text-yellow-400">0</span>)</h2>
+        </div>
+        <div id="skin-grid" class="grid grid-cols-4 gap-3"></div>
+    </div>
+
+    <canvas id="gameCanvas" class="hidden w-full h-full bg-slate-900"></canvas>
 
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        let isBotMode = false;
-        let gameRunning = false;
-        let p1, p2, bullets = [], bombs = [];
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.onresize = resize;
-        resize();
-
-        class Entity {
-            constructor(x, y, color) { this.x = x; this.y = y; this.color = color; this.radius = 15; }
+        // Veri
+        let points = parseInt(localStorage.getItem('points')) || 100;
+        
+        // Marketi Yükle
+        const grid = document.getElementById('skin-grid');
+        for(let i=1; i<=50; i++) {
+            grid.innerHTML += `
+                <div class="skin-card bg-slate-800 p-2 text-center rounded-xl border border-slate-700">
+                    <div class="text-[9px] mb-1">SKIN ${i}</div>
+                    <button onclick="buySkin(${i})" class="bg-green-600 w-full py-1 text-[10px] rounded-lg font-bold">${i*10}P</button>
+                </div>
+            `;
         }
 
-        function startGame(botMode) {
-            isBotMode = botMode;
-            document.getElementById('menu').classList.add('hidden');
-            // Rastgele başlangıç pozisyonları
-            p1 = { ...new Entity(50, 50, 'cyan'), angle: 0, hp: 3 };
-            p2 = { ...new Entity(canvas.width - 50, canvas.height - 50, 'red'), angle: Math.PI, hp: 3 };
-            gameRunning = true;
-            requestAnimationFrame(loop);
+        function buySkin(id) {
+            let price = id * 10;
+            if (points >= price) {
+                points -= price;
+                localStorage.setItem('points', points);
+                updateUI();
+                alert("Skin " + id + " başarıyla alındı!");
+            } else { alert("Puanın yetersiz!"); }
         }
 
-        function loop() {
-            if (!gameRunning) return;
-            ctx.fillStyle = 'rgba(13, 14, 21, 0.3)';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Bomba üretimi
-            if (Math.random() < 0.01 && bombs.length < 3) {
-                bombs.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height });
-            }
-
-            // Bombaları çiz
-            ctx.fillStyle = 'red';
-            bombs.forEach(b => ctx.fillRect(b.x, b.y, 20, 20));
-
-            // Bot Mantığı
-            if (isBotMode) {
-                const dx = p1.x - p2.x;
-                const dy = p1.y - p2.y;
-                p2.angle = Math.atan2(dy, dx);
-                p2.x += Math.cos(p2.angle) * 1.5;
-                p2.y += Math.sin(p2.angle) * 1.5;
-            }
-
-            // Gemileri çiz
-            drawShip(p1);
-            drawShip(p2);
-
-            requestAnimationFrame(loop);
+        function updateUI() {
+            document.getElementById('main-points').innerText = points;
+            document.getElementById('store-points').innerText = points;
         }
 
-        function drawShip(s) {
-            ctx.save();
-            ctx.translate(s.x, s.y);
-            ctx.rotate(s.angle);
-            ctx.fillStyle = s.color;
-            ctx.beginPath();
-            ctx.moveTo(20, 0); ctx.lineTo(-10, -10); ctx.lineTo(-10, 10);
-            ctx.fill();
-            ctx.restore();
+        function showStore() { document.getElementById('lobby').classList.add('hidden'); document.getElementById('store').classList.remove('hidden'); }
+        function hideStore() { document.getElementById('lobby').classList.remove('hidden'); document.getElementById('store').classList.add('hidden'); }
+        
+        function startGame(mode) {
+            document.getElementById('lobby').classList.add('hidden');
+            document.getElementById('gameCanvas').classList.remove('hidden');
+            // Oyun motoru kodların buraya gelecek
+            console.log("Oyun başladı: " + mode);
         }
+
+        updateUI();
     </script>
 </body>
 </html>
