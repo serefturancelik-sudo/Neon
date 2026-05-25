@@ -1,43 +1,765 @@
-<div id="lobby-screen" class="absolute inset-0 bg-slate-950 z-[100] flex flex-col items-center justify-center p-6 text-center">
-    <h1 class="text-4xl font-extrabold mb-8 text-cyan-400">NEON ARENA</h1>
-    <div class="w-full max-w-sm space-y-4">
-        <button onclick="initLobby('bot')" class="w-full py-4 bg-red-600 rounded-xl font-bold border border-red-500 shadow-lg">BOT'A KARŞI OYNA</button>
-        <button onclick="initLobby('pvp')" class="w-full py-4 bg-cyan-600 rounded-xl font-bold border border-cyan-500 shadow-lg">2 KİŞİLİK (TAKIM)</button>
-        <button onclick="alert('Odadan ayrıldın, sayfayı yenile!')" class="w-full py-2 bg-slate-800 text-slate-400 rounded-lg text-xs">ODADAN AYRIL</button>
-    </div>
-</div>
-
-<script>
-    let isBotMode = false;
-
-    function initLobby(mode) {
-        isBotMode = (mode === 'bot');
-        document.getElementById('lobby-screen').classList.add('hidden');
-        startGame(); // Mevcut oyununu başlatır
-    }
-
-    // Oyun döngüsü içine Bot mantığını ekleyelim
-    function updateBot() {
-        if (!isBotMode || !gameRunning) return;
-        
-        // Basit Bot: Kırmızı gemi (p2) Mavi gemiyi (p1) takip eder
-        const dx = p1.x - p2.x;
-        const dy = p1.y - p2.y;
-        const targetAngle = Math.atan2(dy, dx);
-        
-        // Açıyı yakala
-        if (Math.abs(p2.angle - targetAngle) > 0.1) {
-            p2.angle += (p2.angle < targetAngle) ? 0.05 : -0.05;
+```html
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Savaşları - 2 Kişilik</title>
+    <!-- Tailwind CSS ve FontAwesome CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            overflow: hidden;
+            background-color: #0d0e15;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        // Harekete geç
-        p2.vx += Math.cos(p2.angle) * 0.1;
-        p2.vy += Math.sin(p2.angle) * 0.1;
-        
-        // Rastgele ateş et
-        if (Math.random() < 0.03) fireBullet(p2);
-    }
+        /* Dokunmatik gecikmesini engelleme ve kaydırmayı devre dışı bırakma */
+        .touch-btn {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Neon Efektleri */
+        .neon-shadow-blue {
+            box-shadow: 0 0 15px rgba(0, 191, 255, 0.6);
+        }
+        .neon-shadow-red {
+            box-shadow: 0 0 15px rgba(255, 65, 54, 0.6);
+        }
+        .neon-text-blue {
+            text-shadow: 0 0 8px rgba(0, 191, 255, 0.8);
+        }
+        .neon-text-red {
+            text-shadow: 0 0 8px rgba(255, 65, 54, 0.8);
+        }
+        /* Üst Oyuncu için 180 derece döndürme (Telefonu karşılıklı tutmak için) */
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col justify-between items-center text-white select-none">
 
-    // gameLoop fonksiyonunun içine şunu ekle:
-    // updateBot(); // <-- Buraya yaz
-</script>
+    <!-- SES SENTEZLEYİCİ (Harici ses dosyası gerekmez) -->
+    <script>
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioCtx();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'laser') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                } else if (type === 'explosion') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.4);
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+                } else if (type === 'hit') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.1);
+                } else if (type === 'powerup') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
+                }
+            } catch (e) {
+                console.log("Ses çalınamadı", e);
+            }
+        }
+    </script>
+
+    <!-- GİRİŞ & MENÜ EKRANI -->
+    <div id="start-screen" class="absolute inset-0 bg-slate-950 flex flex-col justify-center items-center z-50 p-6 text-center">
+        <h1 class="text-4xl md:text-5xl font-extrabold mb-2 tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-red-500">
+            NEON SAVAŞLARI
+        </h1>
+        <p class="text-xs md:text-sm text-slate-400 mb-8">TEK TELEFONDA KARŞILIKLI ÇIFTE MÜCADELE</p>
+
+        <div class="space-y-6 max-w-sm w-full bg-slate-900/80 p-6 rounded-2xl border border-slate-800 backdrop-blur-md">
+            <h2 class="text-lg font-bold text-slate-300">Nasıl Oynanır?</h2>
+            <div class="flex justify-between items-center gap-4 text-xs">
+                <div class="flex-1 p-3 rounded-lg bg-red-950/40 border border-red-900/50 text-red-300">
+                    <span class="font-bold text-sm block mb-1">KIRMIZI (ÜST)</span>
+                    Ekranın üstündeki tuşları kullan. Yönünü çevir, gazla ve ateş et!
+                </div>
+                <div class="flex-1 p-3 rounded-lg bg-cyan-950/40 border border-cyan-900/50 text-cyan-300">
+                    <span class="font-bold text-sm block mb-1">MAVİ (ALT)</span>
+                    Ekranın altındaki tuşları kullan. Yönünü çevir, gazla ve ateş et!
+                </div>
+            </div>
+            
+            <div class="text-xs text-yellow-400 flex items-center justify-center gap-1">
+                <i class="fas fa-bolt"></i> Ortada beliren güçlendiricileri topla!
+            </div>
+
+            <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-red-500 text-slate-950 font-bold text-xl rounded-xl shadow-lg hover:brightness-110 active:scale-95 transition-all">
+                SAVAŞI BAŞLAT!
+            </button>
+        </div>
+        <p class="absolute bottom-4 text-slate-600 text-[10px]">Cihazınızı yatay değil, dikey tutarak oynayınız.</p>
+    </div>
+
+    <!-- OYUN BİTTİ EKRANI -->
+    <div id="gameover-screen" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col justify-center items-center z-50 p-6 text-center">
+        <div id="winner-box" class="p-8 rounded-2xl border max-w-sm w-full">
+            <h2 id="winner-text" class="text-3xl font-extrabold mb-4">OYUNCU KAZANDI!</h2>
+            <p id="winner-subtext" class="text-sm text-slate-400 mb-6">Karşı rakibini darmadağın etti.</p>
+            <button onclick="restartGame()" class="w-full py-3 bg-white text-slate-950 font-bold rounded-xl active:scale-95 transition-all">
+                Yeniden Oyna
+            </button>
+        </div>
+    </div>
+
+    <!-- ÜST OYUNCU KONTROL PANELİ (180 derece dönük - Kırmızı) -->
+    <div class="w-full h-1/4 bg-slate-950/80 border-b border-red-900/30 flex flex-col justify-between p-3 rotate-180">
+        <!-- Oyuncu Bilgileri -->
+        <div class="flex justify-between items-center w-full">
+            <div class="flex flex-col items-start">
+                <span class="text-xs font-bold text-red-500 neon-text-red">KIRMIZI OYUNCU</span>
+                <div class="flex gap-1 mt-1" id="p2-hearts">
+                    <i class="fas fa-heart text-red-500 text-xs"></i>
+                    <i class="fas fa-heart text-red-500 text-xs"></i>
+                    <i class="fas fa-heart text-red-500 text-xs"></i>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] text-slate-400">SKOR</div>
+                <div class="text-xl font-bold text-red-500" id="p2-score">0</div>
+            </div>
+        </div>
+
+        <!-- Kontrol Butonları -->
+        <div class="flex justify-between items-center w-full gap-4 mt-2">
+            <!-- Sol: Yön Çevirme -->
+            <div class="flex gap-2">
+                <button id="p2-btn-left" class="touch-btn w-14 h-14 bg-red-950/40 active:bg-red-900/80 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 active:scale-90 transition-all neon-shadow-red">
+                    <i class="fas fa-undo text-xl"></i>
+                </button>
+                <button id="p2-btn-right" class="touch-btn w-14 h-14 bg-red-950/40 active:bg-red-900/80 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 active:scale-90 transition-all neon-shadow-red">
+                    <i class="fas fa-redo text-xl"></i>
+                </button>
+            </div>
+            <!-- Sağ: Gaz ve Ateş -->
+            <div class="flex gap-2">
+                <button id="p2-btn-shoot" class="touch-btn w-16 h-14 bg-red-600 active:bg-red-500 border border-red-400 rounded-2xl flex items-center justify-center text-slate-950 font-bold active:scale-90 transition-all">
+                    <i class="fas fa-crosshairs text-xl"></i>
+                </button>
+                <button id="p2-btn-thrust" class="touch-btn w-14 h-14 bg-red-950/40 active:bg-red-900/80 border border-red-500/50 rounded-2xl flex items-center justify-center text-red-400 active:scale-90 transition-all neon-shadow-red">
+                    <i class="fas fa-rocket text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ORTAK OYUN ALANI (Ortadaki Canvas) -->
+    <div class="relative w-full flex-grow bg-slate-900 overflow-hidden">
+        <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+        
+        <!-- Duraklatma / Skor Durumu (Ortada minimal çizgiler) -->
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div class="w-full border-t border-dashed border-slate-700/50"></div>
+        </div>
+    </div>
+
+    <!-- ALT OYUNCU KONTROL PANELİ (Düz - Mavi) -->
+    <div class="w-full h-1/4 bg-slate-950/80 border-t border-cyan-900/30 flex flex-col justify-between p-3">
+        <!-- Kontrol Butonları -->
+        <div class="flex justify-between items-center w-full gap-4 mb-2">
+            <!-- Sol: Yön Çevirme -->
+            <div class="flex gap-2">
+                <button id="p1-btn-left" class="touch-btn w-14 h-14 bg-cyan-950/40 active:bg-cyan-900/80 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 active:scale-90 transition-all neon-shadow-blue">
+                    <i class="fas fa-undo text-xl"></i>
+                </button>
+                <button id="p1-btn-right" class="touch-btn w-14 h-14 bg-cyan-950/40 active:bg-cyan-900/80 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 active:scale-90 transition-all neon-shadow-blue">
+                    <i class="fas fa-redo text-xl"></i>
+                </button>
+            </div>
+            <!-- Sağ: Gaz ve Ateş -->
+            <div class="flex gap-2">
+                <button id="p1-btn-shoot" class="touch-btn w-16 h-14 bg-cyan-500 active:bg-cyan-400 border border-cyan-300 rounded-2xl flex items-center justify-center text-slate-950 font-bold active:scale-90 transition-all">
+                    <i class="fas fa-crosshairs text-xl"></i>
+                </button>
+                <button id="p1-btn-thrust" class="touch-btn w-14 h-14 bg-cyan-950/40 active:bg-cyan-900/80 border border-cyan-500/50 rounded-2xl flex items-center justify-center text-cyan-400 active:scale-90 transition-all neon-shadow-blue">
+                    <i class="fas fa-rocket text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Oyuncu Bilgileri -->
+        <div class="flex justify-between items-center w-full">
+            <div class="flex flex-col items-start">
+                <span class="text-xs font-bold text-cyan-400 neon-text-blue">MAVİ OYUNCU</span>
+                <div class="flex gap-1 mt-1" id="p1-hearts">
+                    <i class="fas fa-heart text-cyan-400 text-xs"></i>
+                    <i class="fas fa-heart text-cyan-400 text-xs"></i>
+                    <i class="fas fa-heart text-cyan-400 text-xs"></i>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] text-slate-400">SKOR</div>
+                <div class="text-xl font-bold text-cyan-400" id="p1-score">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OYUN MOTORU & FİZİK KODLARI -->
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Mobil cihaz boyutuna göre dinamik canvas boyutlandırması
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Oyun Durumu
+        let gameRunning = false;
+        let p1Score = 0;
+        let p2Score = 0;
+
+        // Kontrol Durumları (Tuşlara basılma durumları)
+        const inputs = {
+            p1: { left: false, right: false, thrust: false, shoot: false, lastShoot: 0 },
+            p2: { left: false, right: false, thrust: false, shoot: false, lastShoot: 0 }
+        };
+
+        // Gemi Yapısı
+        class Ship {
+            constructor(x, y, color, angle, id) {
+                this.id = id;
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.angle = angle; // Radyan cinsinden
+                this.vx = 0;
+                this.vy = 0;
+                this.radius = 18;
+                this.maxHp = 3;
+                this.hp = 3;
+                this.shield = 0; // Kalkan süresi (frame)
+                this.tripleShot = 0; // Üçlü atış süresi (frame)
+                this.speedMultiplier = 1;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                // Kalkan Görseli
+                if (this.shield > 0) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius + 8, 0, Math.PI * 2);
+                    ctx.strokeStyle = this.color === 'blue' ? '#38bdf8' : '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.shadowColor = this.color === 'blue' ? '#38bdf8' : '#ef4444';
+                    ctx.shadowBlur = 10;
+                    ctx.stroke();
+                }
+
+                // Gemi Çizimi (Neon Üçgen Savaşçı)
+                ctx.beginPath();
+                ctx.moveTo(this.radius, 0);
+                ctx.lineTo(-this.radius, -this.radius * 0.8);
+                ctx.lineTo(-this.radius * 0.5, 0);
+                ctx.lineTo(-this.radius, this.radius * 0.8);
+                ctx.closePath();
+
+                ctx.fillStyle = '#0f172a';
+                ctx.fill();
+                ctx.strokeStyle = this.color === 'blue' ? '#00bfff' : '#ff4136';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = this.strokeStyle;
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+
+                // Kokpit Bölgesi
+                ctx.beginPath();
+                ctx.arc(2, 0, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            update() {
+                // Sınırlar içinde tut ve hareket ettir
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Sürtünme kuvveti (yavaşlama)
+                this.vx *= 0.96;
+                this.vy *= 0.96;
+
+                // Ekran Sınırları Çarpışma Kontrolü
+                if (this.x < this.radius) { this.x = this.radius; this.vx *= -0.5; }
+                if (this.x > canvas.width - this.radius) { this.x = canvas.width - this.radius; this.vx *= -0.5; }
+                
+                // Oyuncular kendi yarı alan sınırlarından çıkabilir ama ekran dışına taşamaz
+                if (this.y < this.radius) { this.y = this.radius; this.vy *= -0.5; }
+                if (this.y > canvas.height - this.radius) { this.y = canvas.height - this.radius; this.vy *= -0.5; }
+
+                // Güçlendirici sürelerini düşür
+                if (this.shield > 0) this.shield--;
+                if (this.tripleShot > 0) this.tripleShot--;
+            }
+
+            takeDamage() {
+                if (this.shield > 0) return false; // Kalkan hasarı engelledi
+                this.hp--;
+                playSound('hit');
+                createExplosion(this.x, this.y, this.color, 10);
+                updateHearts(this.id, this.hp);
+                if (this.hp <= 0) {
+                    playSound('explosion');
+                    createExplosion(this.x, this.y, this.color, 35);
+                    return true; // Gemi yok oldu
+                }
+                return false;
+            }
+        }
+
+        // Mermi Sınıfı
+        class Bullet {
+            constructor(x, y, angle, color, ownerId) {
+                this.x = x;
+                this.y = y;
+                this.vx = Math.cos(angle) * 7;
+                this.vy = Math.sin(angle) * 7;
+                this.radius = 4;
+                this.color = color;
+                this.ownerId = ownerId;
+                this.life = 120; // 2 saniye ömür
+            }
+
+            draw() {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color === 'blue' ? '#00bfff' : '#ff4136';
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+            }
+        }
+
+        // Güçlendirici Sınıfı (Yıldızlar)
+        class PowerUp {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'shield', 'triple', 'heal'
+                this.radius = 14;
+                this.angle = 0;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                
+                let color = '#fbbf24';
+                let icon = '⚡';
+                if (this.type === 'shield') { color = '#38bdf8'; icon = '🛡️'; }
+                if (this.type === 'heal') { color = '#10b981'; icon = '❤️'; }
+                if (this.type === 'triple') { color = '#ec4899'; icon = '🔥'; }
+
+                ctx.fillStyle = '#1e293b';
+                ctx.fill();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = color;
+                ctx.shadowBlur = 8;
+                ctx.stroke();
+
+                // İkon Çizimi
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Yazının ters durmaması için sabitleme
+                ctx.fillText(icon, 0, 0);
+
+                ctx.restore();
+                this.angle += 0.02;
+            }
+        }
+
+        // Efekt Parçacıkları (Patlamalar için)
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color === 'blue' ? '#00bfff' : (color === 'red' ? '#ff4136' : '#fbbf24');
+                this.vx = (Math.random() - 0.5) * 6;
+                this.vy = (Math.random() - 0.5) * 6;
+                this.radius = Math.random() * 3 + 1;
+                this.life = Math.random() * 30 + 10;
+                this.maxLife = this.life;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life / this.maxLife;
+                ctx.fill();
+                ctx.restore();
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life--;
+            }
+        }
+
+        // Nesne Listeleri
+        let p1, p2;
+        let bullets = [];
+        let powerups = [];
+        let particles = [];
+        let powerupTimer = 0;
+
+        function initGameObjects() {
+            p1 = new Ship(canvas.width / 2, canvas.height - 60, 'blue', -Math.PI / 2, 1);
+            p2 = new Ship(canvas.width / 2, 60, 'red', Math.PI / 2, 2);
+            bullets = [];
+            powerups = [];
+            particles = [];
+            powerupTimer = 0;
+            
+            // Canları Sıfırla
+            updateHearts(1, p1.hp);
+            updateHearts(2, p2.hp);
+        }
+
+        function createExplosion(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function spawnPowerUp() {
+            const types = ['shield', 'triple', 'heal'];
+            const randType = types[Math.floor(Math.random() * types.length)];
+            // Ortadaki dar bir bölgede spawn et (iki oyuncunun da erişebileceği yer)
+            const rx = Math.random() * (canvas.width - 60) + 30;
+            const ry = Math.random() * (canvas.height * 0.4) + (canvas.height * 0.3);
+            powerups.push(new PowerUp(rx, ry, randType));
+            playSound('powerup');
+        }
+
+        // Kalpleri Güncelleme Fonksiyonu
+        function updateHearts(playerId, hp) {
+            const container = document.getElementById(`p${playerId}-hearts`);
+            container.innerHTML = '';
+            const colorClass = playerId === 1 ? 'text-cyan-400' : 'text-red-500';
+            for (let i = 0; i < 3; i++) {
+                if (i < hp) {
+                    container.innerHTML += `<i class="fas fa-heart ${colorClass} text-xs"></i>`;
+                } else {
+                    container.innerHTML += `<i class="far fa-heart text-slate-600 text-xs"></i>`;
+                }
+            }
+        }
+
+        // Ateş Etme Fonksiyonu
+        function fireBullet(ship) {
+            const now = Date.now();
+            const inputState = ship.id === 1 ? inputs.p1 : inputs.p2;
+            
+            if (now - inputState.lastShoot < 300) return; // Ateş hızı sınırı (300ms)
+            inputState.lastShoot = now;
+
+            playSound('laser');
+
+            if (ship.tripleShot > 0) {
+                // Üçlü Atış Güçlendiricisi
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle, ship.color, ship.id));
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle - 0.25, ship.color, ship.id));
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle + 0.25, ship.color, ship.id));
+            } else {
+                // Normal Tekli Atış
+                bullets.push(new Bullet(ship.x, ship.y, ship.angle, ship.color, ship.id));
+            }
+        }
+
+        // Dokunmatik Kontroller için Listenerlar
+        function setupTouchControls() {
+            const touchMappings = [
+                { id: 'p1-btn-left', player: 'p1', action: 'left' },
+                { id: 'p1-btn-right', player: 'p1', action: 'right' },
+                { id: 'p1-btn-thrust', player: 'p1', action: 'thrust' },
+                { id: 'p1-btn-shoot', player: 'p1', action: 'shoot' },
+                
+                { id: 'p2-btn-left', player: 'p2', action: 'left' },
+                { id: 'p2-btn-right', player: 'p2', action: 'right' },
+                { id: 'p2-btn-thrust', player: 'p2', action: 'thrust' },
+                { id: 'p2-btn-shoot', player: 'p2', action: 'shoot' },
+            ];
+
+            touchMappings.forEach(map => {
+                const btn = document.getElementById(map.id);
+                if (!btn) return;
+
+                const startHandler = (e) => {
+                    e.preventDefault();
+                    initAudio(); // Tarayıcı ses engelini kaldırır
+                    inputs[map.player][map.action] = true;
+                };
+
+                const endHandler = (e) => {
+                    e.preventDefault();
+                    inputs[map.player][map.action] = false;
+                };
+
+                btn.addEventListener('touchstart', startHandler, { passive: false });
+                btn.addEventListener('touchend', endHandler, { passive: false });
+                btn.addEventListener('touchcancel', endHandler, { passive: false });
+
+                // Masaüstü testleri için fare desteği
+                btn.addEventListener('mousedown', startHandler);
+                btn.addEventListener('mouseup', endHandler);
+                btn.addEventListener('mouseleave', endHandler);
+            });
+        }
+
+        // İki Çember Arasındaki Mesafe Kontrolü
+        function checkCollision(c1, c2) {
+            const dx = c1.x - c2.x;
+            const dy = c1.y - c2.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            return dist < c1.radius + c2.radius;
+        }
+
+        // Oyun Döngüsü
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // Arka Planı Temizle (Neon efektler için hafif iz bırakarak)
+            ctx.fillStyle = 'rgba(13, 14, 21, 0.4)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Güçlendirici Çıkarma Zamanlayıcısı
+            powerupTimer++;
+            if (powerupTimer > 400) { // Yaklaşık 6-7 saniyede bir
+                if (powerups.length < 2) spawnPowerUp();
+                powerupTimer = 0;
+            }
+
+            // Girdi İşleme - Oyuncu 1 (Mavi)
+            if (inputs.p1.left) p1.angle -= 0.05;
+            if (inputs.p1.right) p1.angle += 0.05;
+            if (inputs.p1.thrust) {
+                p1.vx += Math.cos(p1.angle) * 0.15;
+                p1.vy += Math.sin(p1.angle) * 0.15;
+                // Egzoz kıvılcımları üret
+                if (Math.random() < 0.4) {
+                    particles.push(new Particle(p1.x - Math.cos(p1.angle)*15, p1.y - Math.sin(p1.angle)*15, 'blue'));
+                }
+            }
+            if (inputs.p1.shoot) fireBullet(p1);
+
+            // Girdi İşleme - Oyuncu 2 (Kırmızı)
+            if (inputs.p2.left) p2.angle -= 0.05;
+            if (inputs.p2.right) p2.angle += 0.05;
+            if (inputs.p2.thrust) {
+                p2.vx += Math.cos(p2.angle) * 0.15;
+                p2.vy += Math.sin(p2.angle) * 0.15;
+                // Egzoz kıvılcımları üret
+                if (Math.random() < 0.4) {
+                    particles.push(new Particle(p2.x - Math.cos(p2.angle)*15, p2.y - Math.sin(p2.angle)*15, 'red'));
+                }
+            }
+            if (inputs.p2.shoot) fireBullet(p2);
+
+            // Gemileri Güncelle ve Çiz
+            p1.update();
+            p1.draw();
+
+            p2.update();
+            p2.draw();
+
+            // Gemilerin Birbiriyle Çarpışması (Fiziksel İtme)
+            if (checkCollision(p1, p2)) {
+                playSound('hit');
+                createExplosion((p1.x + p2.x)/2, (p1.y + p2.y)/2, 'yellow', 5);
+                // Basit momentum değişimi
+                const tempVx = p1.vx;
+                const tempVy = p1.vy;
+                p1.vx = p2.vx * 1.2;
+                p1.vy = p2.vy * 1.2;
+                p2.vx = tempVx * 1.2;
+                p2.vy = tempVy * 1.2;
+            }
+
+            // Mermileri Güncelle ve Çiz
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.update();
+                b.draw();
+
+                // Ekran Dışı Kontrolü veya Ömür Bitişi
+                if (b.life <= 0 || b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Mermi Çarpışma Kontrolleri
+                if (b.ownerId === 2 && checkCollision(b, p1)) { // Kırmızı Maviye vurdu
+                    bullets.splice(i, 1);
+                    const destroyed = p1.takeDamage();
+                    if (destroyed) endGame(2); // Kırmızı kazandı
+                    continue;
+                }
+                if (b.ownerId === 1 && checkCollision(b, p2)) { // Mavi Kırmızıya vurdu
+                    bullets.splice(i, 1);
+                    const destroyed = p2.takeDamage();
+                    if (destroyed) endGame(1); // Mavi kazandı
+                    continue;
+                }
+            }
+
+            // Güçlendiricileri Güncelle ve Çiz
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const pu = powerups[i];
+                pu.draw();
+
+                // P1'in toplaması
+                if (checkCollision(pu, p1)) {
+                    applyPowerUp(p1, pu.type);
+                    powerups.splice(i, 1);
+                    continue;
+                }
+                // P2'nin toplaması
+                if (checkCollision(pu, p2)) {
+                    applyPowerUp(p2, pu.type);
+                    powerups.splice(i, 1);
+                    continue;
+                }
+            }
+
+            // Efektleri Güncelle ve Çiz
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const part = particles[i];
+                part.update();
+                part.draw();
+                if (part.life <= 0) particles.splice(i, 1);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Güçlendiriciyi Aktifleştirme
+        function applyPowerUp(ship, type) {
+            playSound('powerup');
+            createExplosion(ship.x, ship.y, 'yellow', 15);
+            if (type === 'shield') {
+                ship.shield = 400; // Yaklaşık 6-7 saniye kalkan
+            } else if (type === 'triple') {
+                ship.tripleShot = 400; // 3'lü mermi modu
+            } else if (type === 'heal') {
+                ship.hp = Math.min(ship.maxHp, ship.hp + 1);
+                updateHearts(ship.id, ship.hp);
+            }
+        }
+
+        // Oyunu Başlat
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').classList.add('hidden');
+            initGameObjects();
+            gameRunning = true;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Oyunu Sonlandır
+        function endGame(winnerId) {
+            gameRunning = false;
+            const screen = document.getElementById('gameover-screen');
+            const winnerText = document.getElementById('winner-text');
+            const winnerBox = document.getElementById('winner-box');
+
+            if (winnerId === 1) {
+                p1Score++;
+                document.getElementById('p1-score').innerText = p1Score;
+                winnerText.innerText = "MAVİ KAZANDI!";
+                winnerText.className = "text-3xl font-extrabold mb-4 text-cyan-400 neon-text-blue";
+                winnerBox.className = "p-8 rounded-2xl border border-cyan-500/50 bg-slate-900/90 max-w-sm w-full neon-shadow-blue";
+            } else {
+                p2Score++;
+                document.getElementById('p2-score').innerText = p2Score;
+                winnerText.innerText = "KIRMIZI KAZANDI!";
+                winnerText.className = "text-3xl font-extrabold mb-4 text-red-500 neon-text-red";
+                winnerBox.className = "p-8 rounded-2xl border border-red-500/50 bg-slate-900/90 max-w-sm w-full neon-shadow-red";
+            }
+
+            screen.classList.remove('hidden');
+        }
+
+        // Yeniden Başlat
+        function restartGame() {
+            document.getElementById('gameover-screen').classList.add('hidden');
+            initGameObjects();
+            gameRunning = true;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Sayfa yüklendiğinde kontrolleri hazırla
+        window.onload = function() {
+            setupTouchControls();
+        };
+    </script>
+</body>
+</html>
+
+```
